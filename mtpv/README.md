@@ -19,11 +19,12 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 14
 1. Install on all tablets, all on the same Wi-Fi.
 2. First start: choose **Controller** on one tablet and **Secondary** on the others. The choice is
    remembered, so later starts go straight into the role.
-3. Controller: tap the middle of the screen for the toolbar → **Open PDF**. Secondaries found via mDNS
+3. Controller: tap the middle of the screen for the toolbar → **Open PDF**, or open a PDF with MTPV from a
+   file manager (this also makes the device the controller). Secondaries found via mDNS
    are added to the right of the controller automatically; **Screens** sets the order (the controller
    can be in any position) and lets you add a secondary by IP if mDNS is blocked.
-4. Turn pages: tap the left/right third of the controller, or use a Bluetooth pedal
-   (Page Up/Down, arrow keys, Space/Enter).
+4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
+   on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
 5. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
    page and arrangement and reconnects; secondaries keep the last page until it does.
 
@@ -38,7 +39,8 @@ On a secondary, long-press for its address and to change the role.
   (30 files / 2 GB, least recently used are removed first).
 - Every display command carries a version (strictly increasing, persisted); secondaries ignore older ones.
 - The controller runs one `SecondaryLink` per secondary that converges it to its target page,
-  uploads the PDF if needed and pings every 3 s.
+  uploads the PDF if needed and pings every 3 s. It also keeps a long-poll request (`GET /v1/input`)
+  open on each secondary, which answers as soon as someone turns a page there.
 
 ## Not in this version
 

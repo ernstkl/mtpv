@@ -30,7 +30,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.ernstkl.mtpv.secondary.SecondaryRuntime
 import kotlinx.coroutines.delay
 
-/** Full-screen page. Until a controller sends something it shows how to reach this device. Long press for info. */
+/**
+ * Full-screen page. Until a controller sends something it shows how to reach this device.
+ * Tapping the left or right third turns pages via the controller; long press for info.
+ */
 @Composable
 fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
     val display by rt.display.collectAsStateWithLifecycle()
@@ -49,7 +52,17 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
         Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) { detectTapGestures(onLongPress = { showInfo = true }) },
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { o ->
+                        when {
+                            o.x < size.width / 3f -> rt.sendInput("prev")
+                            o.x > size.width * 2 / 3f -> rt.sendInput("next")
+                        }
+                    },
+                    onLongPress = { showInfo = true },
+                )
+            },
     ) {
         PageView(display.fileId, display.page, rt::render)
 

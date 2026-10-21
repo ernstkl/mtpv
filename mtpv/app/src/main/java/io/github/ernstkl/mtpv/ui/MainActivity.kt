@@ -1,5 +1,6 @@
 package io.github.ernstkl.mtpv.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -52,16 +53,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        if (savedInstanceState == null) handleOpenIntent(intent)
     }
 
-    /** Bluetooth page-turn pedals send key events; the usual ones are mapped here. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleOpenIntent(intent)
+    }
+
+    /** A PDF opened with this app makes this device the controller and shows the PDF. */
+    private fun handleOpenIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val uri = intent.data ?: return
+        if (app.role.value != Role.CONTROLLER) app.setRole(Role.CONTROLLER)
+        app.controller?.openPdf(uri)
+    }
+
+    /** Bluetooth page-turn pedals send key events; the usual ones are mapped here, in both roles. */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        val controller = app.controller ?: return super.onKeyDown(keyCode, event)
-        when (keyCode) {
-            in NEXT_KEYS -> controller.next()
-            in PREV_KEYS -> controller.prev()
+        val action = when (keyCode) {
+            in NEXT_KEYS -> "next"
+            in PREV_KEYS -> "prev"
             else -> return super.onKeyDown(keyCode, event)
         }
+        app.controller?.let { if (action == "next") it.next() else it.prev() }
+        app.secondary?.sendInput(action)
         return true
     }
 

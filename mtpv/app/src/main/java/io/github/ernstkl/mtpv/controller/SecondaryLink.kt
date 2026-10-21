@@ -4,6 +4,7 @@ import io.github.ernstkl.mtpv.core.PdfCache
 import io.github.ernstkl.mtpv.net.Endpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -22,7 +23,8 @@ data class LinkStatus(
 /**
  * Keeps one secondary in line with its [Target]: verifies its identity, uploads the PDF if it is
  * missing, sends the page, and keeps checking it every few seconds. Only the latest target matters,
- * so missed page turns are never replayed.
+ * so missed page turns are never replayed. A second loop forwards page turns entered on the
+ * secondary to [onInput].
  */
 class SecondaryLink(
     private val uuid: String,
@@ -30,9 +32,13 @@ class SecondaryLink(
     private val cache: PdfCache,
     private val versions: VersionClock,
     private val report: (LinkStatus) -> Unit,
+    private val onInput: (String) -> Unit,
 ) {
     @Volatile private var target: Target? = null
     @Volatile private var endpoint: Endpoint? = null
+
+    /** The endpoint whose identity has been checked; null while offline. */
+    @Volatile private var verified: Endpoint? = null
     private val wake = Channel<Unit>(Channel.CONFLATED)
 
     fun setTarget(t: Target?) {
@@ -47,7 +53,10 @@ class SecondaryLink(
         wake.trySend(Unit)
     }
 
-    fun launchIn(scope: CoroutineScope) = scope.launch { run() }
+    fun launchIn(scope: CoroutineScope) = scope.launch {
+        launch { run() }
+        launch { pollInput() }
+    }
 
     private suspend fun run() {
         var status = LinkStatus()
@@ -58,7 +67,6 @@ class SecondaryLink(
             }
         }
 
-        var verified: Endpoint? = null
         var applied: Target? = null
         var files = emptySet<String>()
         var backoff = 1_000L
@@ -109,6 +117,29 @@ class SecondaryLink(
                 publish(LinkStatus(error = e.message ?: e.javaClass.simpleName))
                 withTimeoutOrNull(backoff) { wake.receive() }
                 backoff = (backoff * 2).coerceAtMost(5_000L)
+            }
+        }
+    }
+
+    private suspend fun pollInput() {
+        var after = -1L
+        var polled: Endpoint? = null
+        while (kotlin.coroutines.coroutineContext.isActive) {
+            val ep = verified
+            if (ep == null) {
+                delay(500)
+                continue
+            }
+            if (ep != polled) {
+                after = -1
+                polled = ep
+            }
+            try {
+                val (seq, events) = SecondaryClient(ep).input(after)
+                after = seq
+                events.forEach(onInput)
+            } catch (e: IOException) {
+                delay(1_000)
             }
         }
     }

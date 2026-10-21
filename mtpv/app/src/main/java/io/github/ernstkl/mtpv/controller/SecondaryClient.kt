@@ -30,6 +30,13 @@ class SecondaryClient(private val ep: Endpoint) {
 
     fun state(): State = request("GET", "/v1/state").let { (_, json) -> parseState(json) }
 
+    /** Waits for page turns entered on the secondary; returns the new sequence number and the actions. */
+    fun input(after: Long): Pair<Long, List<String>> {
+        val (_, json) = request("GET", "/v1/input?after=$after", readTimeoutMs = (Protocol.INPUT_WAIT_MS + 5_000).toInt())
+        val events = json.getJSONArray("events").let { a -> List(a.length()) { a.getString(it) } }
+        return json.getLong("seq") to events
+    }
+
     fun display(controller: String, version: Long, fileId: String?, page: Int): DisplayResult {
         val body = JSONObject()
             .put("controller", controller)
@@ -81,8 +88,9 @@ class SecondaryClient(private val ep: Endpoint) {
         path: String,
         body: ByteArray? = null,
         acceptErrors: Boolean = false,
+        readTimeoutMs: Int = 5_000,
     ): Pair<Int, JSONObject> {
-        val conn = open(method, path)
+        val conn = open(method, path, readTimeoutMs)
         try {
             if (body != null) {
                 conn.doOutput = true

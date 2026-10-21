@@ -26,6 +26,10 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
             s.method == Method.GET && path == "/v1/info" -> ok(rt.info())
             s.method == Method.GET && path == "/v1/files" -> ok(JSONObject().put("files", JSONArray(rt.cache.ids())))
             s.method == Method.GET && path == "/v1/state" -> ok(rt.stateJson())
+            s.method == Method.GET && path == "/v1/input" -> {
+                val after = s.parameters["after"]?.firstOrNull()?.toLongOrNull() ?: -1
+                ok(rt.awaitInput(after, Protocol.INPUT_WAIT_MS))
+            }
             s.method == Method.PUT && path.startsWith("/v1/files/") -> putFile(s, path.removePrefix("/v1/files/"))
             s.method == Method.POST && path == "/v1/display" -> {
                 val body = JSONObject(String(readBody(s), Charsets.UTF_8))

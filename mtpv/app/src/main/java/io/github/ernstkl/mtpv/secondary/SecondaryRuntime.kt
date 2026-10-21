@@ -12,6 +12,7 @@ import io.github.ernstkl.mtpv.net.Protocol
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.Inet4Address
@@ -112,6 +113,36 @@ class SecondaryRuntime(private val app: MtpvApp) {
         prefs.saveDisplay(next)
         fileId?.let { cache.touch(it) }
         return SecondaryServer.ok(stateJson(next))
+    }
+
+    // --- page turns entered on this device, fetched by the controller via long polling ---
+
+    private val inputLock = Object()
+    private var inputSeq = 0L
+    private val recentInput = ArrayDeque<Pair<Long, String>>()
+
+    /** Queues [action] ("next" or "prev") for the controller. */
+    fun sendInput(action: String) = synchronized(inputLock) {
+        inputSeq++
+        recentInput.addLast(inputSeq to action)
+        while (recentInput.size > 20) recentInput.removeFirst()
+        inputLock.notifyAll()
+    }
+
+    /**
+     * Returns the actions after sequence number [after], waiting up to [timeoutMs] for one.
+     * A negative [after] (controller just connected) or one from before a restart of this app
+     * returns the current sequence number at once, without old actions.
+     */
+    fun awaitInput(after: Long, timeoutMs: Long): JSONObject = synchronized(inputLock) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (after == inputSeq) {
+            val left = deadline - System.currentTimeMillis()
+            if (left <= 0) break
+            inputLock.wait(left)
+        }
+        val events = if (after < 0 || after > inputSeq) emptyList() else recentInput.filter { it.first > after }
+        JSONObject().put("seq", inputSeq).put("events", JSONArray(events.map { it.second }))
     }
 
     fun afterStore(id: String) {

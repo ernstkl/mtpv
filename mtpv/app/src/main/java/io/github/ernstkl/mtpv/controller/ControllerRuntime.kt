@@ -187,9 +187,11 @@ class ControllerRuntime(private val app: MtpvApp) {
         s.arrangement.forEachIndexed { slot, uuid ->
             if (uuid == Paging.SELF) return@forEachIndexed
             val link = links.getOrPut(uuid) {
-                val l = SecondaryLink(uuid, prefs.deviceUuid, cache, versions) { status ->
-                    _state.update { it.copy(links = it.links + (uuid to status)) }
-                }
+                val l = SecondaryLink(
+                    uuid, prefs.deviceUuid, cache, versions,
+                    report = { status -> _state.update { it.copy(links = it.links + (uuid to status)) } },
+                    onInput = { action -> scope.launch(Dispatchers.Main) { if (action == "prev") prev() else next() } },
+                )
                 l to l.launchIn(scope)
             }.first
             s.known[uuid]?.let { k -> k.host?.let { link.setEndpoint(Endpoint(it, k.port)) } }
