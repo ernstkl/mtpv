@@ -10,8 +10,14 @@ import java.util.UUID
 
 enum class Role { NONE, CONTROLLER, SECONDARY }
 
-/** A secondary as the controller remembers it. Host and port may be outdated; the UUID is the identity. */
-data class KnownSecondary(val uuid: String, val name: String, val host: String?, val port: Int)
+/**
+ * A secondary as the controller remembers it. Host and port may be outdated; the UUID is the identity.
+ * [token] is the secret the secondary handed out when it was paired with this controller.
+ */
+data class KnownSecondary(val uuid: String, val name: String, val host: String?, val port: Int, val token: String? = null)
+
+/** A controller this secondary accepts commands from (secondary side). */
+data class PairedController(val uuid: String, val name: String, val token: String)
 
 /** What the controller restores at the next start. */
 data class ControllerSession(
@@ -50,7 +56,10 @@ class Prefs(private val context: Context) {
         val known = sp.getString("known", null)?.let { s ->
             JSONArray(s).let { a ->
                 List(a.length()) { a.getJSONObject(it) }.map {
-                    KnownSecondary(it.getString("uuid"), it.getString("name"), it.optString("host").ifEmpty { null }, it.optInt("port"))
+                    KnownSecondary(
+                        it.getString("uuid"), it.getString("name"), it.optString("host").ifEmpty { null }, it.optInt("port"),
+                        it.optString("token").ifEmpty { null },
+                    )
                 }
             }
         }.orEmpty().associateBy { it.uuid }
@@ -67,7 +76,10 @@ class Prefs(private val context: Context) {
     fun saveSession(s: ControllerSession) {
         val known = JSONArray()
         s.known.values.forEach {
-            known.put(JSONObject().put("uuid", it.uuid).put("name", it.name).put("host", it.host ?: "").put("port", it.port))
+            known.put(
+                JSONObject().put("uuid", it.uuid).put("name", it.name).put("host", it.host ?: "").put("port", it.port)
+                    .put("token", it.token ?: "")
+            )
         }
         sp.edit()
             .putString("fileId", s.fileId)
@@ -77,6 +89,18 @@ class Prefs(private val context: Context) {
             .putString("arrangement", JSONArray(s.arrangement).toString())
             .putString("known", known.toString())
             .apply()
+    }
+
+    fun loadPaired(): List<PairedController> = sp.getString("paired", null)?.let { s ->
+        JSONArray(s).let { a ->
+            List(a.length()) { a.getJSONObject(it) }.map { PairedController(it.getString("uuid"), it.getString("name"), it.getString("token")) }
+        }
+    }.orEmpty()
+
+    fun savePaired(list: List<PairedController>) {
+        val a = JSONArray()
+        list.forEach { a.put(JSONObject().put("uuid", it.uuid).put("name", it.name).put("token", it.token)) }
+        sp.edit().putString("paired", a.toString()).apply()
     }
 
     fun loadDisplay() = DisplayState(

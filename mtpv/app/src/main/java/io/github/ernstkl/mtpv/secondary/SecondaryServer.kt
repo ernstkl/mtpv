@@ -13,7 +13,6 @@ import java.io.InputStream
 class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(port) {
 
     override fun serve(session: IHTTPSession): Response = try {
-        rt.onContact()
         route(session)
     } catch (e: HashMismatchException) {
         error(Response.Status.CONFLICT, Protocol.ERR_HASH, e.message)
@@ -23,8 +22,22 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
 
     private fun route(s: IHTTPSession): Response {
         val path = s.uri
+        // Open to anyone: who am I, and asking to be paired.
+        when {
+            s.method == Method.GET && path == "/v1/info" -> return ok(rt.info())
+            s.method == Method.POST && path == "/v1/pair" -> {
+                val body = JSONObject(String(readBody(s), Charsets.UTF_8))
+                val req = rt.pairing.request(body.getString("controller"), body.optString("name").ifEmpty { "Controller" })
+                return ok(JSONObject().put("requestId", req.id).put("code", req.code))
+            }
+            s.method == Method.GET && path.startsWith("/v1/pair/") -> return ok(rt.pairing.status(path.removePrefix("/v1/pair/")))
+        }
+        // Everything else only for paired controllers.
+        val token = s.headers["authorization"]?.removePrefix("Bearer ")?.trim()
+        val controller = rt.pairing.controllerFor(token)
+            ?: return error(Response.Status.UNAUTHORIZED, Protocol.ERR_NOT_PAIRED, "pair this controller first")
+        rt.onContact()
         return when {
-            s.method == Method.GET && path == "/v1/info" -> ok(rt.info())
             s.method == Method.GET && path == "/v1/files" -> ok(JSONObject().put("files", JSONArray(rt.cache.ids())))
             s.method == Method.GET && path == "/v1/state" -> ok(rt.stateJson())
             s.method == Method.GET && path == "/v1/notes" -> ok(rt.notesJson())
@@ -36,7 +49,7 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
             s.method == Method.POST && path == "/v1/display" -> {
                 val body = JSONObject(String(readBody(s), Charsets.UTF_8))
                 rt.applyDisplay(
-                    controller = body.getString("controller"),
+                    controller = controller,
                     version = body.getLong("version"),
                     fileId = body.optString("fileId").ifEmpty { null },
                     page = body.optInt("page"),

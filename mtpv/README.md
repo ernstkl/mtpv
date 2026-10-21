@@ -19,10 +19,12 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 14
 1. Install on all tablets, all on the same Wi-Fi.
 2. First start: choose **Controller** on one tablet and **Secondary** on the others. The choice is
    remembered, so later starts go straight into the role.
-3. Controller: tap the middle of the screen for the toolbar → **Open PDF**, or open a PDF with MTPV from a
-   file manager (this also makes the device the controller). Secondaries found via mDNS
-   are added to the right of the controller automatically; **Screens** sets the order (the controller
-   can be in any position) and lets you add a secondary by IP if mDNS is blocked.
+3. Pair each secondary once: on the controller, tap the middle of the screen → **Screens** → under
+   *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary (both show the same code).
+   Paired secondaries are added to the right of the controller; **Screens** sets the order (the
+   controller can be in any position) and lets you add a secondary by IP if mDNS is blocked.
+   Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
+   Then **Open PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
 5. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
@@ -39,6 +41,9 @@ On a secondary, long-press for its address and to change the role.
 
 - Secondary: HTTP server (NanoHTTPD, port 8765) announced as `_mtpv._tcp` via `NsdManager`,
   with its UUID in the TXT record. API in `net/Protocol.kt`.
+- Pairing: the controller asks (`POST /v1/pair`), the secondary shows its name and a 4-digit code,
+  and tapping Allow there issues a random token. Every other request needs it
+  (`Authorization: Bearer …`). Paired controllers can be removed on the secondary (long press).
 - PDFs are identified by SHA-256 and sent once; both roles keep them in `filesDir/pdfs`
   (30 files / 2 GB, least recently used are removed first).
 - Every display command carries a version (strictly increasing, persisted); secondaries ignore older ones.
@@ -56,5 +61,5 @@ on screen, so a secondary keeps serving and the controller keeps receiving page 
 
 ## Not in this version
 
-Pairing/authentication (anyone on the Wi-Fi can drive a secondary), undo, exporting a PDF with the notes
-burnt in, and Wi-Fi Direct.
+Encryption (tokens travel in plain HTTP on the local network), undo, exporting a PDF with the notes
+burnt in, NFC as a pairing shortcut, and Wi-Fi Direct.

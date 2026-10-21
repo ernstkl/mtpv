@@ -17,6 +17,8 @@ data class Target(val fileId: String?, val page: Int)
 
 data class LinkStatus(
     val online: Boolean = false,
+    /** The secondary refuses this controller: pair it (again). */
+    val notPaired: Boolean = false,
     val shownPage: Int? = null,
     val upload: Float? = null,
     val error: String? = null,
@@ -54,6 +56,7 @@ class SecondaryLink(
 ) {
     @Volatile private var target: Target? = null
     @Volatile private var endpoint: Endpoint? = null
+    @Volatile private var token: String? = null
 
     /** The endpoint whose identity has been checked; null while offline. */
     @Volatile private var verified: Endpoint? = null
@@ -62,6 +65,13 @@ class SecondaryLink(
     fun setTarget(t: Target?) {
         if (t == target) return
         target = t
+        wake.trySend(Unit)
+    }
+
+    fun setToken(t: String?) {
+        if (t == token) return
+        token = t
+        verified = null
         wake.trySend(Unit)
     }
 
@@ -91,13 +101,14 @@ class SecondaryLink(
 
         while (kotlin.coroutines.coroutineContext.isActive) {
             val ep = endpoint
-            if (ep == null) {
-                publish(LinkStatus(error = "not found yet"))
+            val tok = token
+            if (ep == null || tok == null) {
+                publish(if (tok == null) LinkStatus(notPaired = true, error = "not paired") else LinkStatus(error = "not found yet"))
                 wake.receive()
                 continue
             }
             try {
-                val client = SecondaryClient(ep)
+                val client = SecondaryClient(ep, tok)
                 if (verified != ep) {
                     val info = client.info()
                     if (info.uuid != uuid) throw IOException("a different device answers at $ep")
@@ -146,6 +157,11 @@ class SecondaryLink(
                     val st = client.state()
                     if (applied != null && (st.fileId != applied.fileId || st.page != applied.page)) applied = null
                 }
+            } catch (e: NotPairedException) {
+                // Only a new pairing (setToken) helps; wait for it.
+                verified = null
+                publish(LinkStatus(online = true, notPaired = true, error = "not paired"))
+                wake.receive()
             } catch (e: IOException) {
                 verified = null
                 publish(LinkStatus(error = e.message ?: e.javaClass.simpleName))
@@ -169,7 +185,7 @@ class SecondaryLink(
                 polled = ep
             }
             try {
-                val (seq, events) = SecondaryClient(ep).input(after)
+                val (seq, events) = SecondaryClient(ep, token).input(after)
                 after = seq
                 events.forEach(onInput)
             } catch (e: IOException) {

@@ -119,6 +119,25 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
 
     if (showScreens) ScreensDialog(rt, st) { showScreens = false }
 
+    st.pairing?.let { p ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Pairing with ${p.name}") },
+            text = {
+                Column {
+                    if (p.code == null) {
+                        Text("Contacting ${p.name}…")
+                    } else {
+                        Text("On ${p.name}, check that it shows this code and tap Allow:")
+                        Spacer(Modifier.height(12.dp))
+                        Text(p.code, style = MaterialTheme.typography.displayMedium)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = rt::cancelPairing) { Text("Cancel") } },
+        )
+    }
+
     st.message?.let { msg ->
         AlertDialog(
             onDismissRequest = rt::clearMessage,
@@ -146,7 +165,7 @@ private fun StatusDots(st: ControllerState, modifier: Modifier) {
 }
 
 private fun colorFor(l: LinkStatus?): Color = when {
-    l == null || !l.online -> Offline
+    l == null || !l.online || l.notPaired -> Offline
     l.upload != null -> Busy
     else -> Online
 }
@@ -177,7 +196,22 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
                         }
                         TextButton(onClick = { rt.move(slot, -1) }, enabled = slot > 0) { Text("◀") }
                         TextButton(onClick = { rt.move(slot, +1) }, enabled = slot < s.arrangement.lastIndex) { Text("▶") }
-                        if (id != Paging.SELF) TextButton(onClick = { rt.exclude(id) }) { Text("Remove") }
+                        if (id != Paging.SELF) {
+                            if (st.links[id]?.notPaired == true) TextButton(onClick = { rt.pair(id) }) { Text("Pair") }
+                            TextButton(onClick = { rt.exclude(id) }) { Text("Remove") }
+                        }
+                    }
+                }
+
+                val nearby = st.nearby.values.filter { it.uuid !in s.known }
+                if (nearby.isNotEmpty()) {
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    Text("Nearby, not paired", style = MaterialTheme.typography.labelLarge)
+                    nearby.forEach { k ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${k.name} (${k.uuid.take(4)})", Modifier.weight(1f))
+                            TextButton(onClick = { rt.pair(k.uuid) }) { Text("Pair") }
+                        }
                     }
                 }
 
@@ -196,7 +230,8 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
 
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Text(
-                    "Secondaries on the same Wi-Fi appear automatically. If not, enter the address shown on the secondary.",
+"Secondaries on the same Wi-Fi appear under Nearby. Pair one, then tap Allow on it. If it does not " +
+                        "appear, enter the address shown on the secondary.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(4.dp))
@@ -231,6 +266,7 @@ private fun nameOf(st: ControllerState, uuid: String): String =
 private fun describe(l: LinkStatus?): String = when {
     l == null -> "connecting…"
     l.upload != null -> "sending PDF ${(l.upload * 100).toInt()}%"
+    l.notPaired -> "not paired"
     l.online -> "online"
     else -> "offline" + (l.error?.let { ": $it" } ?: "")
 }

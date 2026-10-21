@@ -40,6 +40,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
     val cache = app.cache
     private val prefs = app.prefs
     private val nsd = app.getSystemService(Context.NSD_SERVICE) as NsdManager
+    val pairing = Pairing(prefs)
 
     private val _display = MutableStateFlow(prefs.loadDisplay())
     val display: StateFlow<DisplayState> = _display

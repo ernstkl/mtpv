@@ -10,10 +10,14 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+/** The secondary does not (or no longer) accept this controller; it has to be paired again. */
+class NotPairedException : IOException("not paired")
+
 /** Blocking calls to one secondary's HTTP API. Every failure is an IOException. */
-class SecondaryClient(private val ep: Endpoint) {
+class SecondaryClient(private val ep: Endpoint, private val token: String? = null) {
 
     data class Info(val uuid: String, val name: String)
+    data class PairStatus(val status: String, val token: String?)
     data class State(val fileId: String?, val page: Int, val version: Long)
     data class Notes(val fileId: String?, val page: Int, val baseRev: Long, val rev: Long, val dirty: Boolean, val strokes: List<Stroke>)
 
@@ -26,6 +30,17 @@ class SecondaryClient(private val ep: Endpoint) {
 
     fun info(): Info = request("GET", "/v1/info").let { (_, json) ->
         Info(json.getString("uuid"), json.getString("name"))
+    }
+
+    /** Asks to be paired; returns the request ID and the code both screens show. */
+    fun pairRequest(controller: String, name: String): Pair<String, String> {
+        val body = JSONObject().put("controller", controller).put("name", name).toString().toByteArray()
+        val (_, json) = request("POST", "/v1/pair", body)
+        return json.getString("requestId") to json.getString("code")
+    }
+
+    fun pairStatus(requestId: String): PairStatus = request("GET", "/v1/pair/$requestId").let { (_, json) ->
+        PairStatus(json.getString("status"), json.optString("token").ifEmpty { null })
     }
 
     fun files(): Set<String> = request("GET", "/v1/files").let { (_, json) ->
@@ -104,6 +119,7 @@ class SecondaryClient(private val ep: Endpoint) {
                 }
             }
             val code = conn.responseCode
+            if (code == 401) throw NotPairedException()
             if (code != 200) throw IOException("upload failed: HTTP $code ${readJson(conn).optString("message")}")
         } finally {
             conn.disconnect()
@@ -126,6 +142,7 @@ class SecondaryClient(private val ep: Endpoint) {
                 conn.outputStream.use { it.write(body) }
             }
             val code = conn.responseCode
+            if (code == 401) throw NotPairedException()
             val json = readJson(conn)
             if (code != 200 && !acceptErrors) throw IOException("$method $path: HTTP $code")
             return code to json
@@ -143,6 +160,7 @@ class SecondaryClient(private val ep: Endpoint) {
             connectTimeout = 3_000
             readTimeout = readTimeoutMs
             useCaches = false
+            token?.let { setRequestProperty("Authorization", "Bearer $it") }
         }
     }
 

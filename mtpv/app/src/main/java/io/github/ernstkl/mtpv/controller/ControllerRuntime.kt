@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -22,12 +23,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
+
+/** A pairing in progress: [code] is shown here and on the secondary, where someone taps Allow. */
+data class PairingUi(val uuid: String, val name: String, val code: String?)
 
 data class ControllerState(
     val session: ControllerSession,
     val links: Map<String, LinkStatus> = emptyMap(),
     /** Page shown on each secondary, whose notes may have unsaved edits there. */
     val held: Map<String, PageKey> = emptyMap(),
+    /** Secondaries found on the network that are not paired with this controller. */
+    val nearby: Map<String, KnownSecondary> = emptyMap(),
+    val pairing: PairingUi? = null,
     val busy: String? = null,
     val message: String? = null,
 ) {
@@ -121,14 +129,16 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     // --- screens ---
 
-    /** Called by discovery (main thread). A secondary seen for the first time is added as the last screen. */
+    /**
+     * Called by discovery (main thread). Known secondaries get their new address; others are only
+     * listed as nearby until they are paired, so strangers on a crowded network never join.
+     */
     private fun onFound(uuid: String, name: String, ep: Endpoint) {
-        updateSession { s ->
-            val isNew = uuid !in s.known
-            s.copy(
-                known = s.known + (uuid to KnownSecondary(uuid, name, ep.host, ep.port)),
-                arrangement = if (isNew && uuid !in s.arrangement) s.arrangement + uuid else s.arrangement,
-            )
+        val known = _state.value.session.known[uuid]
+        if (known != null) {
+            updateSession { s -> s.copy(known = s.known + (uuid to known.copy(name = name, host = ep.host, port = ep.port))) }
+        } else {
+            _state.update { it.copy(nearby = it.nearby + (uuid to KnownSecondary(uuid, name, ep.host, ep.port))) }
         }
     }
 
@@ -140,7 +150,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 val info = SecondaryClient(ep).info()
                 withContext(Dispatchers.Main) {
                     onFound(info.uuid, info.name, ep)
-                    include(info.uuid)
+                    if (_state.value.session.known[info.uuid]?.token != null) include(info.uuid) else pair(info.uuid)
                 }
             } catch (e: Exception) {
                 showMessage("No MTPV secondary at $host:$port (${e.message})")
@@ -168,6 +178,63 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     fun forget(uuid: String) = updateSession { s ->
         s.copy(arrangement = s.arrangement - uuid, known = s.known - uuid)
+    }
+
+    // --- pairing ---
+
+    private var pairJob: Job? = null
+
+    /** Asks secondary [uuid] to accept this controller; someone has to tap Allow on it within a minute. */
+    fun pair(uuid: String) {
+        val st = _state.value
+        val k = st.session.known[uuid] ?: st.nearby[uuid] ?: return
+        val host = k.host ?: return
+        pairJob?.cancel()
+        pairJob = scope.launch {
+            _state.update { it.copy(pairing = PairingUi(uuid, k.name, null)) }
+            try {
+                val client = SecondaryClient(Endpoint(host, k.port))
+                val (requestId, code) = client.pairRequest(prefs.deviceUuid, prefs.deviceName)
+                _state.update { it.copy(pairing = PairingUi(uuid, k.name, code)) }
+                val deadline = System.currentTimeMillis() + PAIR_TIMEOUT_MS
+                while (System.currentTimeMillis() < deadline) {
+                    val r = client.pairStatus(requestId)
+                    when (r.status) {
+                        "allowed" -> {
+                            withContext(Dispatchers.Main) { paired(k.copy(token = r.token)) }
+                            return@launch
+                        }
+                        "denied" -> {
+                            showMessage("${k.name} declined the pairing.")
+                            return@launch
+                        }
+                        "unknown" -> break
+                    }
+                    delay(1_000)
+                }
+                showMessage("No answer from ${k.name}. Try again, and tap Allow on it.")
+            } catch (e: IOException) {
+                showMessage("Could not reach ${k.name}: ${e.message}")
+            } finally {
+                _state.update { if (it.pairing?.uuid == uuid) it.copy(pairing = null) else it }
+            }
+        }
+    }
+
+    fun cancelPairing() {
+        pairJob?.cancel()
+        _state.update { it.copy(pairing = null) }
+    }
+
+    /** A newly paired secondary becomes the rightmost screen. */
+    private fun paired(k: KnownSecondary) {
+        _state.update { it.copy(nearby = it.nearby - k.uuid) }
+        updateSession { s ->
+            s.copy(
+                known = s.known + (k.uuid to k),
+                arrangement = if (k.uuid in s.arrangement) s.arrangement else s.arrangement + k.uuid,
+            )
+        }
     }
 
     fun render(fileId: String?, page: Int, w: Int, h: Int) = app.renderers.render(fileId, page, w, h)
@@ -233,8 +300,15 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 )
                 l to l.launchIn(scope)
             }.first
-            s.known[uuid]?.let { k -> k.host?.let { link.setEndpoint(Endpoint(it, k.port)) } }
+            s.known[uuid]?.let { k ->
+                k.host?.let { link.setEndpoint(Endpoint(it, k.port)) }
+                link.setToken(k.token)
+            }
             link.setTarget(s.fileId?.let { Target(it, st.pageForSlot(slot)) })
         }
+    }
+
+    companion object {
+        private const val PAIR_TIMEOUT_MS = 60_000L
     }
 }

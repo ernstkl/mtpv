@@ -3,6 +3,7 @@ package io.github.ernstkl.mtpv.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -97,10 +98,47 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
         AlertDialog(
             onDismissRequest = { showInfo = false },
             title = { Text("This secondary") },
-            text = { DeviceInfo(rt, connected) },
+            text = {
+                Column {
+                    DeviceInfo(rt, connected)
+                    PairedControllers(rt)
+                }
+            },
             confirmButton = { TextButton(onClick = { showInfo = false }) { Text("Close") } },
             dismissButton = { TextButton(onClick = onLeaveRole) { Text("Change role") } },
         )
+    }
+
+    // A controller asks to be paired: whoever can tap this screen decides.
+    val requests by rt.pairing.requests.collectAsStateWithLifecycle()
+    requests.firstOrNull()?.let { req ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Pair with ${req.name}?") },
+            text = {
+                Column {
+                    Text("Allow only if the controller shows the same code:")
+                    Spacer(Modifier.height(12.dp))
+                    Text(req.code, style = MaterialTheme.typography.displayMedium)
+                }
+            },
+            confirmButton = { TextButton(onClick = { rt.pairing.answer(req.id, allow = true) }) { Text("Allow") } },
+            dismissButton = { TextButton(onClick = { rt.pairing.answer(req.id, allow = false) }) { Text("Deny") } },
+        )
+    }
+}
+
+@Composable
+private fun PairedControllers(rt: SecondaryRuntime) {
+    val paired by rt.pairing.paired.collectAsStateWithLifecycle()
+    Spacer(Modifier.height(12.dp))
+    Text("Paired controllers", style = MaterialTheme.typography.labelLarge)
+    if (paired.isEmpty()) Text("none")
+    paired.forEach { p ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${p.name} (${p.uuid.take(4)})", Modifier.weight(1f))
+            TextButton(onClick = { rt.pairing.remove(p.uuid) }) { Text("Remove") }
+        }
     }
 }
 
@@ -108,7 +146,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
 private fun DeviceInfo(rt: SecondaryRuntime, connected: Boolean) {
     val display by rt.display.collectAsStateWithLifecycle()
     Column {
-        Text(if (connected) "Connected to controller" else "Waiting for controller…")
+        Text(if (connected) "Connected to controller" else "Waiting for a paired controller…")
         Text("Address: " + rt.addresses().joinToString { "$it:${rt.port}" }.ifEmpty { "no network" })
         Text("ID: ${rt.info().getString("uuid").take(8)}  Name: ${rt.info().getString("name")}")
         Text("Showing: " + if (display.fileId == null) "nothing" else "page ${display.page}")
