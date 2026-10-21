@@ -23,7 +23,8 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 14
    file manager (this also makes the device the controller). Secondaries found via mDNS
    are added to the right of the controller automatically; **Screens** sets the order (the controller
    can be in any position) and lets you add a secondary by IP if mDNS is blocked.
-4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
+4. Turn pages: tap the left third of any screen, controller or secondary, to push the pages to the left
+   (forward), the right third to push them right (back). Or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
 5. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
    page and arrangement and reconnects; secondaries keep the last page until it does.

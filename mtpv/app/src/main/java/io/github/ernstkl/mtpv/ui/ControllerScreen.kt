@@ -49,8 +49,8 @@ private val Busy = Color(0xFFF9A825)
 private val Offline = Color(0xFFC62828)
 
 /**
- * The controller's own page. Tap the left third to go back, the right third to go forward,
- * the middle to show or hide the toolbar. Pedal keys are handled in MainActivity.
+ * The controller's own page. Tapping the left third moves the pages left (forward), the right third
+ * moves them right (back), the middle shows or hides the toolbar. Pedal keys are handled in MainActivity.
  */
 @Composable
 fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
@@ -69,8 +69,8 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
             .pointerInput(Unit) {
                 detectTapGestures { o ->
                     when {
-                        o.x < size.width / 3f -> rt.prev()
-                        o.x > size.width * 2 / 3f -> rt.next()
+                        o.x < size.width / 3f -> rt.next()
+                        o.x > size.width * 2 / 3f -> rt.prev()
                         else -> showBar = !showBar
                     }
                 }
