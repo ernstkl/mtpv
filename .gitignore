@@ -1,3 +1,6 @@
 # Reference clone of github.com/thebigg73/OpenSongTablet (its own git repo)
 /OpenSongTablet/
 *~
+
+# Private notes and chat logs, kept out of git
+/developer-notes/

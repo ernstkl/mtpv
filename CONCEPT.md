@@ -1,7 +1,7 @@
 # MTPV Concept: Multi-Tablet PDF Viewer
 
 Status: draft, 2026-10-21. Findings come from reading the code only; nothing is built or tested yet.
-Planning notes from the claude.ai project: `input-docs/MTPV_Planung.md`.
+Planning notes from the claude.ai project: `developer-notes/MTPV_Planung.md`.
 
 ## Goal
 
