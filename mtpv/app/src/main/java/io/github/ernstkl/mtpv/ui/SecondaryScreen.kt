@@ -32,8 +32,7 @@ import kotlinx.coroutines.delay
 
 /**
  * Full-screen page. Until a controller sends something it shows how to reach this device.
- * Tapping the left third moves the pages left (forward), the right third moves them right (back),
- * via the controller; long press for info.
+ * Tapping the left or right third turns pages via the controller; long press for info.
  */
 @Composable
 fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
@@ -57,8 +56,8 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                 detectTapGestures(
                     onTap = { o ->
                         when {
-                            o.x < size.width / 3f -> rt.sendInput("next")
-                            o.x > size.width * 2 / 3f -> rt.sendInput("prev")
+                            o.x < size.width / 3f -> rt.sendInput("prev")
+                            o.x > size.width * 2 / 3f -> rt.sendInput("next")
                         }
                     },
                     onLongPress = { showInfo = true },
