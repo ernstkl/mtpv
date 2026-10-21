@@ -38,6 +38,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ernstkl.mtpv.core.NotesGeometry
+import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.Tool
 import kotlin.random.Random
@@ -53,18 +54,24 @@ enum class NoteTool(val tool: Tool?, val color: Long, val width: Float) {
 
 /**
  * Notes over a page; it must exactly cover the rendered page. Only the stylus draws (its eraser end,
- * or the eraser tool, removes whole strokes), so fingers still turn pages underneath.
+ * or the eraser tool, removes whole strokes), so fingers still turn pages underneath. Each change
+ * names the page the stroke started on, even if the screen has moved to another page meanwhile.
+ * [onPen] reports whether the stylus is down.
  */
 @OptIn(ExperimentalComposeUiApi::class) // historical points: smooth strokes at high stylus sample rates
 @Composable
 fun NotesLayer(
+    page: PageKey,
     strokes: List<Stroke>,
     tool: NoteTool,
     enabled: Boolean,
-    onChange: (List<Stroke>) -> Unit,
+    onChange: (PageKey, List<Stroke>) -> Unit,
     modifier: Modifier = Modifier,
+    onPen: (Boolean) -> Unit = {},
 ) {
+    val currentPage by rememberUpdatedState(page)
     val current by rememberUpdatedState(strokes)
+    val pen by rememberUpdatedState(onPen)
     val currentTool by rememberUpdatedState(tool)
     val change by rememberUpdatedState(onChange)
     val live = remember { mutableStateListOf<Float>() }
@@ -82,14 +89,16 @@ fun NotesLayer(
                     val w = size.width.toFloat()
                     val h = size.height.toFloat()
                     val erasing = down.type == PointerType.Eraser || currentTool == NoteTool.ERASER
-                    var remaining = current
+                    val startPage = currentPage
+                    val base = current
+                    var remaining = base
 
                     fun at(p: Offset) {
                         if (erasing) {
                             val hit = remaining.filter { NotesGeometry.hits(it, p.x, p.y, w, h, slop = 8.dp.toPx()) }
                             if (hit.isNotEmpty()) {
                                 remaining = remaining - hit.toSet()
-                                change(remaining)
+                                change(startPage, remaining)
                             }
                         } else {
                             live.add((p.x / w).coerceIn(0f, 1f))
@@ -99,21 +108,26 @@ fun NotesLayer(
 
                     live.clear()
                     liveTool = if (erasing) null else currentTool
-                    at(down.position)
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val c = event.changes.firstOrNull { it.id == down.id } ?: break
-                        c.historical.forEach { at(it.position) }
-                        at(c.position)
-                        c.consume()
-                        if (!c.pressed) break
+                    pen(true)
+                    try {
+                        at(down.position)
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val c = event.changes.firstOrNull { it.id == down.id } ?: break
+                            c.historical.forEach { at(it.position) }
+                            at(c.position)
+                            c.consume()
+                            if (!c.pressed) break
+                        }
+                        val t = liveTool
+                        if (t?.tool != null && live.isNotEmpty()) {
+                            change(startPage, base + Stroke(Random.nextLong(), t.tool, t.color.toInt(), t.width, live.toFloatArray()))
+                        }
+                    } finally {
+                        live.clear()
+                        liveTool = null
+                        pen(false)
                     }
-                    val t = liveTool
-                    if (t?.tool != null && live.isNotEmpty()) {
-                        change(current + Stroke(Random.nextLong(), t.tool, t.color.toInt(), t.width, live.toFloatArray()))
-                    }
-                    live.clear()
-                    liveTool = null
                 }
             },
     ) {

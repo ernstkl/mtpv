@@ -133,7 +133,8 @@ class SecondaryLink(
                         }
                         is SecondaryClient.DisplayResult.Stale -> versions.bumpTo(r.currentVersion)
                         SecondaryClient.DisplayResult.UnknownFile -> files = files - fileId.orEmpty()
-                        SecondaryClient.DisplayResult.NotesUnsaved -> Unit // written to meanwhile; fetch again
+                        // Being written on, or written to meanwhile: fetch again shortly.
+                        SecondaryClient.DisplayResult.NotesUnsaved -> delay(100)
                     }
                     publish(LinkStatus(online = true, shownPage = applied?.page))
                     continue

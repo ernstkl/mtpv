@@ -8,6 +8,7 @@ import android.util.Log
 import io.github.ernstkl.mtpv.DisplayState
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.core.NotesJson
+import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.VersionGate
 import io.github.ernstkl.mtpv.net.Protocol
@@ -143,7 +144,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
             return SecondaryServer.error(NanoHTTPD.Response.Status.NOT_FOUND, Protocol.ERR_UNKNOWN_FILE, fileId)
         }
         val shown = _notes.value
-        if (shown.dirty && savedRev < shown.rev) {
+        if (isWriting() || (shown.dirty && savedRev < shown.rev)) {
             return SecondaryServer.error(NanoHTTPD.Response.Status.CONFLICT, Protocol.ERR_NOTES_UNSAVED, null)
         }
         val next = DisplayState(fileId, page, version, controller)
@@ -158,10 +159,26 @@ class SecondaryRuntime(private val app: MtpvApp) {
 
     /** Replaces the strokes of the shown page after drawing or erasing on this device. */
     @Synchronized
-    fun editNotes(strokes: List<Stroke>) {
+    fun editNotes(key: PageKey, strokes: List<Stroke>) {
         val cur = _notes.value
-        if (cur.fileId == null || cur.page <= 0) return
+        // Page changes wait while the pen is down (see isWriting), so this only misses after a timeout.
+        if (cur.fileId != key.fileId || cur.page != key.page) {
+            Log.w(TAG, "dropped notes for page ${key.page}, now showing ${cur.page}")
+            return
+        }
         setShownNotes(cur.copy(rev = cur.rev + 1, dirty = true, strokes = strokes))
+    }
+
+    @Volatile private var penDownAt = 0L
+
+    /** While the stylus is down, page changes are refused so the stroke stays on its page. */
+    fun setPenDown(down: Boolean) {
+        penDownAt = if (down) System.currentTimeMillis() else 0L
+    }
+
+    private fun isWriting(): Boolean {
+        val at = penDownAt
+        return at != 0L && System.currentTimeMillis() - at < MAX_STROKE_MS
     }
 
     @Synchronized
@@ -240,5 +257,6 @@ class SecondaryRuntime(private val app: MtpvApp) {
 
     companion object {
         private const val TAG = "MtpvSecondary"
+        private const val MAX_STROKE_MS = 15_000L
     }
 }

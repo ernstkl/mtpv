@@ -3,7 +3,6 @@ package io.github.ernstkl.mtpv.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -69,22 +67,20 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
         Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) {
-                detectTapGestures { o ->
-                    when {
-                        o.x < size.width / 3f -> rt.prev()
-                        o.x > size.width * 2 / 3f -> rt.next()
-                        else -> showBar = !showBar
-                    }
+            .pageTaps(onTap = { o, size ->
+                when {
+                    o.x < size.width / 3f -> rt.prev()
+                    o.x > size.width * 2 / 3f -> rt.next()
+                    else -> showBar = !showBar
                 }
-            },
+            }),
     ) {
         PageView(s.fileId, st.ownPage, rt::render) { fileId, page ->
             val key = PageKey(fileId, page)
             val changes by rt.notesChanges.collectAsStateWithLifecycle()
             val strokes = remember(key, changes) { rt.load(key).strokes }
             // While a secondary still holds this page's latest notes, wait for them before drawing.
-            NotesLayer(strokes, tool, enabled = st.holderOf(key) == null, onChange = { rt.editNotes(key, it) })
+            NotesLayer(key, strokes, tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes)
         }
         if (s.fileId != null) NoteToolPicker(tool, { tool = it }, Modifier.align(Alignment.BottomStart).padding(8.dp))
 

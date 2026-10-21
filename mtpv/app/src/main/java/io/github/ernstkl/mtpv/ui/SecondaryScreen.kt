@@ -1,7 +1,6 @@
 package io.github.ernstkl.mtpv.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -25,9 +24,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.secondary.SecondaryRuntime
 import kotlinx.coroutines.delay
 
@@ -54,22 +53,23 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
         Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { o ->
-                        when {
-                            o.x < size.width / 3f -> rt.sendInput("prev")
-                            o.x > size.width * 2 / 3f -> rt.sendInput("next")
-                        }
-                    },
-                    onLongPress = { showInfo = true },
-                )
-            },
+            .pageTaps(
+                onTap = { o, size ->
+                    when {
+                        o.x < size.width / 3f -> rt.sendInput("prev")
+                        o.x > size.width * 2 / 3f -> rt.sendInput("next")
+                    }
+                },
+                onLongPress = { showInfo = true },
+            ),
     ) {
         PageView(display.fileId, display.page, rt::render) { fileId, page ->
             val notes by rt.notes.collectAsStateWithLifecycle()
             if (notes.fileId == fileId && notes.page == page) {
-                NotesLayer(notes.strokes, tool, enabled = true, onChange = rt::editNotes)
+                NotesLayer(
+                    PageKey(fileId, page), notes.strokes, tool, enabled = true,
+                    onChange = rt::editNotes, onPen = rt::setPenDown,
+                )
             }
         }
         if (display.fileId != null && display.page > 0) {
