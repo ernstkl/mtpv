@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Three tablets side by side, each showing the next page; the marker stands for notes. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M29,37 h12 a2,2 0 0 1 2,2 v30 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-30 a2,2 0 0 1 2,-2 z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M48,37 h12 a2,2 0 0 1 2,2 v30 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-30 a2,2 0 0 1 2,-2 z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M67,37 h12 a2,2 0 0 1 2,2 v30 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-30 a2,2 0 0 1 2,-2 z"/>
+</vector>

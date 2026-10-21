@@ -1,0 +1,1 @@
+Spread a PDF across several tablets, one page per screen, with handwritten notes

@@ -1,0 +1,6 @@
+First release.
+- One PDF spread across several tablets, one page per screen
+- Controller and secondary roles in one app, remembered across restarts
+- Page turns by tap or Bluetooth pedal from any screen
+- Stylus notes (pens, marker, eraser) that follow their page
+- Pairing by confirming on the secondary

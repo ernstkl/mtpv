@@ -14,7 +14,7 @@
     <application
         android:name=".MtpvApp"
         android:label="MTPV"
-        android:icon="@android:drawable/ic_menu_gallery"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.Mtpv"
         android:usesCleartextTraffic="true">
         <activity

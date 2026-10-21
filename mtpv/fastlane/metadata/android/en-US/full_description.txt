@@ -1,0 +1,22 @@
+<p>MTPV shows one PDF on several Android tablets side by side, like extra monitors on a PC: the tablet on the left shows page 1, the next one page 2, and so on. Turning the page moves every screen on by one page. It was made for sheet music on a music stand, but works for any PDF.</p>
+
+<p>One app takes both roles. The <b>controller</b> opens the PDF and turns the pages; each <b>secondary</b> shows its page. The roles are remembered, so at the next rehearsal you switch the tablets on, start the app, and carry on where you stopped.</p>
+
+<p><b>Features</b></p>
+<ul>
+<li>One page per tablet, in any order you arrange them; screens past the last page stay blank</li>
+<li>Turn pages by tapping the left or right edge of any screen, or with a Bluetooth page-turn pedal (Page Up/Down, arrow keys)</li>
+<li>Handwritten notes with a stylus on every screen: pens in three colours, a marker and an eraser. Notes follow the page to whichever screen shows it and never change the PDF itself</li>
+<li>The PDF is sent to the other tablets automatically and kept there</li>
+<li>Open PDFs from any file manager</li>
+<li>Pairing: a secondary obeys only controllers that were allowed on its own screen, so it works on networks with other MTPV users</li>
+<li>Resumes the last PDF, page and screen arrangement after a restart</li>
+</ul>
+
+<p><b>Requirements</b></p>
+<ul>
+<li>Android 14 or newer on every tablet</li>
+<li>All tablets in the same Wi-Fi network (no internet connection needed, nothing leaves your network)</li>
+</ul>
+
+<p>The connection between the tablets is plain HTTP inside your local network; pairing tokens are not encrypted in transit.</p>
