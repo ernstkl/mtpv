@@ -94,21 +94,21 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
         StatusDots(st, Modifier.align(Alignment.TopEnd).padding(6.dp))
 
         if (showBar) {
-            Row(
+            // Title and buttons on separate lines, so a long PDF name fits on narrow screens too.
+            Column(
                 Modifier
                     .fillMaxWidth()
                     .background(Color(0xCC000000))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(s.fileName ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                    Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
+                Text(s.fileName ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = { picker.launch(arrayOf("application/pdf")) }) { Text("Open PDF") }
+                    Button(onClick = { showScreens = true }) { Text("Screens (${s.arrangement.size})") }
+                    TextButton(onClick = onLeaveRole) { Text("Change role") }
                 }
-                Button(onClick = { picker.launch(arrayOf("application/pdf")) }) { Text("Open PDF") }
-                Button(onClick = { showScreens = true }) { Text("Screens (${s.arrangement.size})") }
-                TextButton(onClick = onLeaveRole) { Text("Change role") }
             }
         }
 
@@ -181,12 +181,14 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 s.arrangement.forEachIndexed { slot, id ->
                     val page = st.pageForSlot(slot)
+                    // Name and status get the full width; the buttons go on their own line below.
+                    if (slot > 0) Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (id != Paging.SELF) {
                             Box(Modifier.size(10.dp).background(colorFor(st.links[id]), CircleShape))
                             Spacer(Modifier.width(8.dp))
                         }
-                        Column(Modifier.weight(1f)) {
+                        Column {
                             Text(if (id == Paging.SELF) "This device" else nameOf(st, id))
                             Text(
                                 (if (s.fileId == null) "" else if (page == 0) "blank · " else "page $page · ") +
@@ -194,6 +196,8 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { rt.move(slot, -1) }, enabled = slot > 0) { Text("◀") }
                         TextButton(onClick = { rt.move(slot, +1) }, enabled = slot < s.arrangement.lastIndex) { Text("▶") }
                         if (id != Paging.SELF) {
