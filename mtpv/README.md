@@ -42,7 +42,9 @@ On a secondary, long-press for its address and to change the role.
   uploads the PDF if needed and pings every 3 s. It also keeps a long-poll request (`GET /v1/input`)
   open on each secondary, which answers as soon as someone turns a page there.
 
+While a role is active, a foreground service (with a notification) keeps the app running when it is not
+on screen, so a secondary keeps serving and the controller keeps receiving page turns.
+
 ## Not in this version
 
-Pairing/authentication (anyone on the Wi-Fi can drive a secondary), notes/annotations,
-a foreground service (the secondary serves while its screen is on), and Wi-Fi Direct.
+Pairing/authentication (anyone on the Wi-Fi can drive a secondary), notes/annotations, and Wi-Fi Direct.
