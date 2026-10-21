@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
     }
     val connected = now - lastContact < 10_000
     var showInfo by remember { mutableStateOf(false) }
+    var tool by rememberSaveable { mutableStateOf(NoteTool.PEN_BLACK) }
 
     Box(
         Modifier
@@ -64,7 +66,15 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                 )
             },
     ) {
-        PageView(display.fileId, display.page, rt::render)
+        PageView(display.fileId, display.page, rt::render) { fileId, page ->
+            val notes by rt.notes.collectAsStateWithLifecycle()
+            if (notes.fileId == fileId && notes.page == page) {
+                NotesLayer(notes.strokes, tool, enabled = true, onChange = rt::editNotes)
+            }
+        }
+        if (display.fileId != null && display.page > 0) {
+            NoteToolPicker(tool, { tool = it }, Modifier.align(Alignment.BottomStart).padding(8.dp))
+        }
 
         if (display.fileId == null) {
             Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {

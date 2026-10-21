@@ -1,5 +1,7 @@
 package io.github.ernstkl.mtpv.controller
 
+import io.github.ernstkl.mtpv.core.NotesJson
+import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.net.Endpoint
 import io.github.ernstkl.mtpv.net.Protocol
 import org.json.JSONObject
@@ -13,11 +15,13 @@ class SecondaryClient(private val ep: Endpoint) {
 
     data class Info(val uuid: String, val name: String)
     data class State(val fileId: String?, val page: Int, val version: Long)
+    data class Notes(val fileId: String?, val page: Int, val baseRev: Long, val rev: Long, val dirty: Boolean, val strokes: List<Stroke>)
 
     sealed interface DisplayResult {
         data object Ok : DisplayResult
         data class Stale(val currentVersion: Long) : DisplayResult
         data object UnknownFile : DisplayResult
+        data object NotesUnsaved : DisplayResult
     }
 
     fun info(): Info = request("GET", "/v1/info").let { (_, json) ->
@@ -30,6 +34,17 @@ class SecondaryClient(private val ep: Endpoint) {
 
     fun state(): State = request("GET", "/v1/state").let { (_, json) -> parseState(json) }
 
+    fun notes(): Notes = request("GET", "/v1/notes").let { (_, json) ->
+        Notes(
+            fileId = json.optString("fileId").ifEmpty { null },
+            page = json.optInt("page"),
+            baseRev = json.optLong("baseRev"),
+            rev = json.optLong("rev"),
+            dirty = json.optBoolean("dirty"),
+            strokes = NotesJson.fromJson(json.optJSONArray("strokes")),
+        )
+    }
+
     /** Waits for page turns entered on the secondary; returns the new sequence number and the actions. */
     fun input(after: Long): Pair<Long, List<String>> {
         val (_, json) = request("GET", "/v1/input?after=$after", readTimeoutMs = (Protocol.INPUT_WAIT_MS + 5_000).toInt())
@@ -37,17 +52,29 @@ class SecondaryClient(private val ep: Endpoint) {
         return json.getLong("seq") to events
     }
 
-    fun display(controller: String, version: Long, fileId: String?, page: Int): DisplayResult {
+    fun display(
+        controller: String,
+        version: Long,
+        fileId: String?,
+        page: Int,
+        notes: List<Stroke>,
+        notesRev: Long,
+        savedRev: Long,
+    ): DisplayResult {
         val body = JSONObject()
             .put("controller", controller)
             .put("version", version)
             .put("fileId", fileId ?: "")
             .put("page", page)
+            .put("notes", NotesJson.toJson(notes))
+            .put("notesRev", notesRev)
+            .put("savedRev", savedRev)
         val (code, json) = request("POST", "/v1/display", body.toString().toByteArray(), acceptErrors = true)
         return when {
             code == 200 -> DisplayResult.Ok
             json.optString("error") == Protocol.ERR_STALE -> DisplayResult.Stale(json.optLong("version"))
             json.optString("error") == Protocol.ERR_UNKNOWN_FILE -> DisplayResult.UnknownFile
+            json.optString("error") == Protocol.ERR_NOTES_UNSAVED -> DisplayResult.NotesUnsaved
             else -> throw IOException("display failed: HTTP $code ${json.optString("message")}")
         }
     }

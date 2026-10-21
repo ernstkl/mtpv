@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.ernstkl.mtpv.controller.ControllerRuntime
 import io.github.ernstkl.mtpv.controller.ControllerState
 import io.github.ernstkl.mtpv.controller.LinkStatus
+import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Paging
 import io.github.ernstkl.mtpv.net.Protocol
 
@@ -58,6 +60,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val s = st.session
     var showBar by remember { mutableStateOf(s.fileId == null) }
     var showScreens by remember { mutableStateOf(false) }
+    var tool by rememberSaveable { mutableStateOf(NoteTool.PEN_BLACK) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(rt::openPdf)
     }
@@ -76,7 +79,14 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                 }
             },
     ) {
-        PageView(s.fileId, st.ownPage, rt::render)
+        PageView(s.fileId, st.ownPage, rt::render) { fileId, page ->
+            val key = PageKey(fileId, page)
+            val changes by rt.notesChanges.collectAsStateWithLifecycle()
+            val strokes = remember(key, changes) { rt.load(key).strokes }
+            // While a secondary still holds this page's latest notes, wait for them before drawing.
+            NotesLayer(strokes, tool, enabled = st.holderOf(key) == null, onChange = { rt.editNotes(key, it) })
+        }
+        if (s.fileId != null) NoteToolPicker(tool, { tool = it }, Modifier.align(Alignment.BottomStart).padding(8.dp))
 
         if (s.fileId == null) {
             Text(

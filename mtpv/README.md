@@ -28,6 +28,10 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 14
 5. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
    page and arrangement and reconnects; secondaries keep the last page until it does.
 
+Notes: write with the stylus on any screen; fingers keep turning pages. The dot in the bottom-left
+corner picks black/red/blue pen, yellow marker or eraser (whole strokes; the stylus eraser end works
+too). Notes belong to the PDF's content: a changed PDF starts without notes.
+
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
 On a secondary, long-press for its address and to change the role.
 
@@ -38,6 +42,11 @@ On a secondary, long-press for its address and to change the role.
 - PDFs are identified by SHA-256 and sent once; both roles keep them in `filesDir/pdfs`
   (30 files / 2 GB, least recently used are removed first).
 - Every display command carries a version (strictly increasing, persisted); secondaries ignore older ones.
+- Notes are vector strokes in page-relative coordinates. The controller keeps the authoritative copy
+  (`filesDir/notes/<fileId>/<page>.json`) and sends a page's strokes with it. A secondary saves edits
+  at once and marks them dirty; before it gets another page, the controller fetches and saves them
+  (a display command is refused with `notes_unsaved` otherwise). If both sides changed a page while a
+  secondary was offline, all strokes are kept.
 - The controller runs one `SecondaryLink` per secondary that converges it to its target page,
   uploads the PDF if needed and pings every 3 s. It also keeps a long-poll request (`GET /v1/input`)
   open on each secondary, which answers as soon as someone turns a page there.
@@ -47,4 +56,5 @@ on screen, so a secondary keeps serving and the controller keeps receiving page 
 
 ## Not in this version
 
-Pairing/authentication (anyone on the Wi-Fi can drive a secondary), notes/annotations, and Wi-Fi Direct.
+Pairing/authentication (anyone on the Wi-Fi can drive a secondary), undo, exporting a PDF with the notes
+burnt in, and Wi-Fi Direct.

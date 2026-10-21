@@ -7,6 +7,8 @@ import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import io.github.ernstkl.mtpv.DisplayState
 import io.github.ernstkl.mtpv.MtpvApp
+import io.github.ernstkl.mtpv.core.NotesJson
+import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.VersionGate
 import io.github.ernstkl.mtpv.net.Protocol
 import fi.iki.elonen.NanoHTTPD
@@ -14,8 +16,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.io.IOException
 import java.net.Inet4Address
+
+/**
+ * Notes of the page a secondary shows. [rev] counts edits on this device and never resets;
+ * [dirty] means there are edits the controller has not fetched yet. [baseRev] is the controller's
+ * revision of the notes it sent with the page.
+ */
+data class ShownNotes(
+    val fileId: String?,
+    val page: Int,
+    val baseRev: Long,
+    val rev: Long,
+    val dirty: Boolean,
+    val strokes: List<Stroke>,
+)
 
 /** Secondary role: serves the HTTP API, announces it via mDNS and holds what the screen shows. */
 class SecondaryRuntime(private val app: MtpvApp) {
@@ -25,6 +42,10 @@ class SecondaryRuntime(private val app: MtpvApp) {
 
     private val _display = MutableStateFlow(prefs.loadDisplay())
     val display: StateFlow<DisplayState> = _display
+
+    private val notesFile = File(app.filesDir, "shown-notes.json")
+    private val _notes = MutableStateFlow(loadNotes())
+    val notes: StateFlow<ShownNotes> = _notes
 
     /** Time of the last request from a controller, for the "connected" indicator. */
     private val _lastContact = MutableStateFlow(0L)
@@ -97,8 +118,21 @@ class SecondaryRuntime(private val app: MtpvApp) {
         .put("version", d.version)
         .put("controller", d.controller ?: "")
 
+    /**
+     * Shows [page] with its [notes]. Refused with notes_unsaved while this device has edits that the
+     * controller has not saved yet ([savedRev] older than the current edit count), so no note is
+     * lost when the page moves on: the controller fetches them first and then retries.
+     */
     @Synchronized
-    fun applyDisplay(controller: String, version: Long, fileId: String?, page: Int): NanoHTTPD.Response {
+    fun applyDisplay(
+        controller: String,
+        version: Long,
+        fileId: String?,
+        page: Int,
+        notes: List<Stroke>,
+        notesRev: Long,
+        savedRev: Long,
+    ): NanoHTTPD.Response {
         val cur = _display.value
         if (!VersionGate.accepts(cur.controller, cur.version, controller, version)) {
             return SecondaryServer.error(
@@ -108,12 +142,58 @@ class SecondaryRuntime(private val app: MtpvApp) {
         if (fileId != null && !cache.has(fileId)) {
             return SecondaryServer.error(NanoHTTPD.Response.Status.NOT_FOUND, Protocol.ERR_UNKNOWN_FILE, fileId)
         }
+        val shown = _notes.value
+        if (shown.dirty && savedRev < shown.rev) {
+            return SecondaryServer.error(NanoHTTPD.Response.Status.CONFLICT, Protocol.ERR_NOTES_UNSAVED, null)
+        }
         val next = DisplayState(fileId, page, version, controller)
         _display.value = next
         prefs.saveDisplay(next)
+        setShownNotes(ShownNotes(fileId, page, notesRev, shown.rev, dirty = false, strokes = notes))
         fileId?.let { cache.touch(it) }
         return SecondaryServer.ok(stateJson(next))
     }
+
+    // --- notes on the shown page ---
+
+    /** Replaces the strokes of the shown page after drawing or erasing on this device. */
+    @Synchronized
+    fun editNotes(strokes: List<Stroke>) {
+        val cur = _notes.value
+        if (cur.fileId == null || cur.page <= 0) return
+        setShownNotes(cur.copy(rev = cur.rev + 1, dirty = true, strokes = strokes))
+    }
+
+    @Synchronized
+    fun notesJson(): JSONObject = _notes.value.let { n ->
+        JSONObject()
+            .put("fileId", n.fileId ?: "")
+            .put("page", n.page)
+            .put("baseRev", n.baseRev)
+            .put("rev", n.rev)
+            .put("dirty", n.dirty)
+            .put("strokes", NotesJson.toJson(n.strokes))
+    }
+
+    /** Persisted immediately, so unsaved notes survive a crash or a restart of this device. */
+    private fun setShownNotes(n: ShownNotes) {
+        _notes.value = n
+        val tmp = File(notesFile.parentFile, notesFile.name + ".tmp")
+        tmp.writeText(notesJson().toString())
+        tmp.renameTo(notesFile)
+    }
+
+    private fun loadNotes(): ShownNotes = runCatching {
+        val o = JSONObject(notesFile.readText())
+        ShownNotes(
+            fileId = o.optString("fileId").ifEmpty { null },
+            page = o.optInt("page"),
+            baseRev = o.optLong("baseRev"),
+            rev = o.optLong("rev"),
+            dirty = o.optBoolean("dirty"),
+            strokes = NotesJson.fromJson(o.optJSONArray("strokes")),
+        )
+    }.getOrDefault(ShownNotes(null, 0, 0, 0, false, emptyList()))
 
     // --- page turns entered on this device, fetched by the controller via long polling ---
 

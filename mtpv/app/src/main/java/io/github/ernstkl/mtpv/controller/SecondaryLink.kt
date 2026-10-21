@@ -1,5 +1,7 @@
 package io.github.ernstkl.mtpv.controller
 
+import io.github.ernstkl.mtpv.core.NotesStore
+import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.PdfCache
 import io.github.ernstkl.mtpv.net.Endpoint
 import kotlinx.coroutines.CoroutineScope
@@ -20,10 +22,25 @@ data class LinkStatus(
     val error: String? = null,
 )
 
+/** How links hand notes to the controller. Implemented by [ControllerRuntime]. */
+interface NotesHub {
+    /** Saves notes edited on secondary [uuid]. */
+    fun saveFromSecondary(uuid: String, notes: SecondaryClient.Notes)
+
+    /** Waits (briefly) until no other reachable secondary still holds unsaved notes of [key]. */
+    suspend fun awaitFree(key: PageKey, uuid: String)
+
+    fun load(key: PageKey): NotesStore.Page
+
+    /** Secondary [uuid] now shows [key] (null: nothing); its notes there may change until fetched. */
+    fun hold(uuid: String, key: PageKey?)
+}
+
 /**
  * Keeps one secondary in line with its [Target]: verifies its identity, uploads the PDF if it is
  * missing, sends the page, and keeps checking it every few seconds. Only the latest target matters,
- * so missed page turns are never replayed. A second loop forwards page turns entered on the
+ * so missed page turns are never replayed. Before a secondary gets a new page, the notes on its
+ * current page are fetched and saved, so they are never lost. A second loop forwards page turns entered on the
  * secondary to [onInput].
  */
 class SecondaryLink(
@@ -31,6 +48,7 @@ class SecondaryLink(
     private val controllerId: String,
     private val cache: PdfCache,
     private val versions: VersionClock,
+    private val notes: NotesHub,
     private val report: (LinkStatus) -> Unit,
     private val onInput: (String) -> Unit,
 ) {
@@ -97,10 +115,25 @@ class SecondaryLink(
                         client.upload(fileId, cache.file(fileId)) { publish(status.copy(upload = it)) }
                         files = files + fileId
                     }
-                    when (val r = client.display(controllerId, versions.next(), fileId, want.page)) {
-                        SecondaryClient.DisplayResult.Ok -> applied = want
+                    // Save what was written on the current page before it is replaced.
+                    val back = client.notes()
+                    if (back.dirty && back.fileId != null && back.page > 0) notes.saveFromSecondary(uuid, back)
+                    notes.hold(uuid, null)
+                    val key = fileId?.takeIf { want.page > 0 }?.let { PageKey(it, want.page) }
+                    key?.let { notes.awaitFree(it, uuid) }
+                    val page = key?.let { notes.load(it) }
+                    val r = client.display(
+                        controllerId, versions.next(), fileId, want.page,
+                        page?.strokes.orEmpty(), page?.rev ?: 0, back.rev,
+                    )
+                    when (r) {
+                        SecondaryClient.DisplayResult.Ok -> {
+                            applied = want
+                            notes.hold(uuid, key)
+                        }
                         is SecondaryClient.DisplayResult.Stale -> versions.bumpTo(r.currentVersion)
                         SecondaryClient.DisplayResult.UnknownFile -> files = files - fileId.orEmpty()
+                        SecondaryClient.DisplayResult.NotesUnsaved -> Unit // written to meanwhile; fetch again
                     }
                     publish(LinkStatus(online = true, shownPage = applied?.page))
                     continue

@@ -1,6 +1,7 @@
 package io.github.ernstkl.mtpv.secondary
 
 import io.github.ernstkl.mtpv.core.HashMismatchException
+import io.github.ernstkl.mtpv.core.NotesJson
 import io.github.ernstkl.mtpv.core.PdfCache
 import io.github.ernstkl.mtpv.net.Protocol
 import fi.iki.elonen.NanoHTTPD
@@ -26,6 +27,7 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
             s.method == Method.GET && path == "/v1/info" -> ok(rt.info())
             s.method == Method.GET && path == "/v1/files" -> ok(JSONObject().put("files", JSONArray(rt.cache.ids())))
             s.method == Method.GET && path == "/v1/state" -> ok(rt.stateJson())
+            s.method == Method.GET && path == "/v1/notes" -> ok(rt.notesJson())
             s.method == Method.GET && path == "/v1/input" -> {
                 val after = s.parameters["after"]?.firstOrNull()?.toLongOrNull() ?: -1
                 ok(rt.awaitInput(after, Protocol.INPUT_WAIT_MS))
@@ -38,6 +40,9 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
                     version = body.getLong("version"),
                     fileId = body.optString("fileId").ifEmpty { null },
                     page = body.optInt("page"),
+                    notes = NotesJson.fromJson(body.optJSONArray("notes")),
+                    notesRev = body.optLong("notesRev"),
+                    savedRev = body.optLong("savedRev", -1),
                 )
             }
             else -> error(Response.Status.NOT_FOUND, "not_found", path)
