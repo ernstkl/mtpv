@@ -1,6 +1,7 @@
 package io.github.ernstkl.mtpv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,8 +11,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,7 +37,8 @@ import kotlinx.coroutines.delay
 
 /**
  * Full-screen page. Until a controller sends something it shows how to reach this device.
- * Tapping the left or right third turns pages via the controller; long press for info.
+ * Tapping the left or right third turns pages via the controller; the middle, ☰ or a long press
+ * opens this secondary's info and settings.
  */
 @Composable
 fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
@@ -61,6 +66,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                     when {
                         o.x < size.width / 3f -> rt.sendInput("prev")
                         o.x > size.width * 2 / 3f -> rt.sendInput("next")
+                        else -> showInfo = true
                     }
                 },
                 onLongPress = { showInfo = true },
@@ -92,6 +98,19 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                 Spacer(Modifier.height(16.dp))
                 DeviceInfo(rt, connected)
             }
+        }
+
+        // A tap target only, so the pen still draws right next to it.
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(4.dp)
+                .size(40.dp)
+                .background(Color(0x66000000), CircleShape)
+                .clickable(onClickLabel = "Menu") { showInfo = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White.copy(alpha = 0.6f))
         }
 
         Box(

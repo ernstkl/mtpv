@@ -59,7 +59,7 @@ Tool and finger switch are the same on all screens, like one big sheet of paper:
 one screen is picked on all of them. The stylus draws on every screen whatever the switch says. Notes belong to the PDF's content: a changed PDF starts without notes.
 
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
-On a secondary, long-press for its address and **Device role**.
+On a secondary, tap the middle of the screen (or ☰ top left) for its address, paired controllers and **Device role**.
 
 ## How it works
 
@@ -67,7 +67,7 @@ On a secondary, long-press for its address and **Device role**.
   with its UUID in the TXT record. API in `net/Protocol.kt`.
 - Pairing: the controller asks (`POST /v1/pair`), the secondary shows its name and a 4-digit code,
   and tapping Allow there issues a random token. Every other request needs it
-  (`Authorization: Bearer …`). Paired controllers can be removed on the secondary (long press).
+  (`Authorization: Bearer …`). Paired controllers can be removed on the secondary (tap the middle or ☰).
 - PDFs are identified by SHA-256 and sent once; both roles keep them in `filesDir/pdfs`
   (100 files / 2 GB, least recently used are removed first; the controller never removes the open set's files).
 - A folder is read through the Storage Access Framework (read access only, kept across restarts; one
