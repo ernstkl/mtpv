@@ -143,12 +143,7 @@ class Folders(private val context: Context) {
     }
 
     companion object {
-        /** The folder a URI stands for: a picked tree becomes the document URI of its top folder. */
-        fun folderOf(uri: Uri): Uri =
-            if (DocumentsContract.isTreeUri(uri) && uri.pathSegments.size < 4) {
-                DocumentsContract.buildDocumentUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri))
-            } else {
-                uri
-            }
+        /** The top folder of a picked [tree], as a document URI. */
+        fun folderOf(tree: Uri): Uri = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
     }
 }
