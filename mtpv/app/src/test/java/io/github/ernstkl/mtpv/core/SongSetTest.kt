@@ -94,6 +94,11 @@ class SetOrderTest {
     }
 
     @Test
+    fun reorderedKeepsFilesThatAreNoSongs() {
+        assertEquals(listOf("B", "A", "Broken"), SetOrder.reordered(listOf("A", "Broken", "B"), listOf("B", "A")))
+    }
+
+    @Test
     fun renamedFileIsNew() {
         assertEquals(listOf("B", "A2"), SetOrder.merge(listOf("A", "B"), listOf("A2", "B")))
     }

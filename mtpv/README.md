@@ -28,7 +28,9 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10
    For a song set, collect one PDF per song in a folder and tap **Open folder**: the PDFs follow each
    other like one long PDF, in alphabetical order (numbers by value, so "2" comes before "10"). Opening
    the same folder again keeps its order; files added since go to the end, removed ones drop out.
-   Files without pages are left out. Subfolders are not included.
+   Files without pages are left out. Subfolders are not included. **Songs** lists the set: tap a song
+   to show it from the leftmost screen, ▲ ▼ change the order (kept for that folder), **Reload folder**
+   picks up added or removed PDFs. The toolbar shows the song on the leftmost screen.
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.

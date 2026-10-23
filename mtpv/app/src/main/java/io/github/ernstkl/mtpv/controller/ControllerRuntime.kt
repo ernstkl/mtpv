@@ -86,6 +86,8 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private val folders = Folders(app)
     val notesChanges: StateFlow<Long> = notes.changes
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /** Writes of a folder's song order, one after the other, so the last one wins. */
+    private val orderWrites = Dispatchers.IO.limitedParallelism(1)
     private val versions = VersionClock({ prefs.lastVersion }, { prefs.lastVersion = it })
     private val links = mutableMapOf<String, Pair<SecondaryLink, Job>>()
     private var discovery: Discovery? = null
@@ -184,6 +186,35 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             } finally {
                 _state.update { it.copy(busy = null) }
             }
+        }
+    }
+
+    fun reloadFolder() {
+        _state.value.session.folder?.let { openFolder(Uri.parse(it)) }
+    }
+
+    // --- songs ---
+
+    /** Shows song [index] from its first page on the leftmost screen. */
+    fun jumpToSong(index: Int) = updateSession { s ->
+        val set = s.set ?: return@updateSession s
+        if (index !in set.songs.indices) s else s.copy(start = set.firstPageOf(index))
+    }
+
+    /** Moves a song up or down; the controller's own screen keeps its page. The order is stored for the folder. */
+    fun moveSong(index: Int, delta: Int) {
+        updateSession { s ->
+            val set = s.set ?: return@updateSession s
+            val moved = set.move(index, delta)
+            val self = s.arrangement.indexOf(Paging.SELF)
+            val start = set.locate(s.start + self)?.let { moved.pageOf(it) - self } ?: s.start
+            s.copy(set = moved, start = start)
+        }
+        val s = _state.value.session
+        val tree = s.folder?.let(Uri::parse) ?: return
+        val songs = s.set?.songs?.map { it.name } ?: return
+        scope.launch(orderWrites) {
+            folders.load(tree)?.let { r -> folders.save(tree, r.copy(order = SetOrder.reordered(r.order, songs))) }
         }
     }
 

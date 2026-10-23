@@ -65,6 +65,15 @@ object SetOrder {
         val keptSet = kept.toSet()
         return kept + present.filter { it !in keptSet }.distinct().sortedWith(NaturalOrder)
     }
+
+    /**
+     * Stored order after the songs were rearranged to [songs]. Files that are no songs (unreadable,
+     * no pages) keep their names in the order, at the end, so they are not taken for new files.
+     */
+    fun reordered(stored: List<String>, songs: List<String>): List<String> {
+        val songSet = songs.toSet()
+        return songs + stored.filter { it !in songSet }
+    }
 }
 
 /** Case-insensitive, with numbers compared by value: "2 Song" comes before "10 Song". */

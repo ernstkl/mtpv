@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.ernstkl.mtpv.controller.ControllerRuntime
@@ -60,6 +61,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val s = st.session
     var showBar by remember { mutableStateOf(s.set == null) }
     var showScreens by remember { mutableStateOf(false) }
+    var showSongs by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     val changes by rt.notesChanges.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -117,11 +119,16 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 Text(s.set?.name ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
+                Text(pageSummary(st), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(6.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { picker.launch(arrayOf("application/pdf")) }) { Text("Open PDF") }
                     Button(onClick = { folderPicker.launch(null) }) { Text("Open folder") }
+                    s.set?.let { set ->
+                        if (s.folder != null || set.songs.size > 1) {
+                            Button(onClick = { showSongs = true }) { Text("Songs (${set.songs.size})") }
+                        }
+                    }
                     Button(onClick = { showScreens = true }) { Text("Screens (${s.arrangement.size})") }
                     TextButton(onClick = onLeaveRole) { Text("Change role") }
                     TextButton(onClick = { showAbout = true }) { Text("?") }
@@ -135,6 +142,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     }
 
     if (showScreens) ScreensDialog(rt, st) { showScreens = false }
+    if (showSongs) SongsDialog(rt, st) { showSongs = false }
     if (showAbout) AboutDialog { showAbout = false }
 
     st.pairing?.let { p ->
@@ -167,9 +175,12 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
 
 private fun pageSummary(st: ControllerState): String {
     val s = st.session
-    if (s.set == null) return "No PDF open"
+    val set = s.set ?: return "No PDF open"
     val last = minOf(s.start + s.arrangement.size - 1, st.totalPages)
-    return "Pages ${s.start}–$last of ${st.totalPages}"
+    val pages = "Pages ${s.start}–$last of ${st.totalPages}"
+    if (set.songs.size < 2) return pages
+    val i = set.songIndexAt(s.start)
+    return "Song ${i + 1} of ${set.songs.size}: ${songTitle(set.songs[i].name)} · $pages"
 }
 
 /** One dot per secondary, in screen order: green shows the right page, yellow is busy, red is unreachable. */
