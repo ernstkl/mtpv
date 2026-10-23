@@ -3,11 +3,10 @@ package io.github.ernstkl.mtpv.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,17 +19,25 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +52,7 @@ import io.github.ernstkl.mtpv.controller.LinkStatus
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Paging
 import io.github.ernstkl.mtpv.net.Protocol
+import kotlinx.coroutines.launch
 
 private val Online = Color(0xFF2E7D32)
 private val Busy = Color(0xFFF9A825)
@@ -52,14 +60,14 @@ private val Offline = Color(0xFFC62828)
 
 /**
  * The controller's own page. Tap the left third to go back, the right third to go forward,
- * the middle to show or hide the toolbar. Pedal keys are handled in MainActivity.
+ * the middle (or ☰) to open the menu drawer. Pedal keys are handled in MainActivity.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val st by rt.state.collectAsStateWithLifecycle()
     val s = st.session
-    var showBar by remember { mutableStateOf(s.set == null) }
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     var showScreens by remember { mutableStateOf(false) }
     var showSongs by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
@@ -70,75 +78,97 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let(rt::openPickedFolder)
     }
+    val libraryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let(rt::setLibrary)
+    }
+    /** Closes the drawer, then does [action]. */
+    fun menu(action: () -> Unit) {
+        scope.launch { drawer.close() }
+        action()
+    }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .pageTaps(onTap = { o, size ->
-                when {
-                    o.x < size.width / 3f -> rt.prev()
-                    o.x > size.width * 2 / 3f -> rt.next()
-                    else -> showBar = !showBar
-                }
-            }),
-    ) {
-        val own = st.ownTarget
-        PageView(own?.fileId, own?.page ?: 0, rt::render) { fileId, page ->
-            val key = PageKey(fileId, page)
-            val strokes = remember(key, changes) { rt.load(key).strokes }
-            // While a secondary still holds this page's latest notes, wait for them before drawing.
-            NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes, fingers = st.tools.fingers)
-        }
-        if (own?.fileId != null && own.page > 0) {
-            val key = PageKey(own.fileId, own.page)
-            val strokes = remember(key, changes) { rt.load(key).strokes }
-            NoteToolPicker(
-                st.tools.tool, rt::setTool, st.tools.fingers, rt::setFingers,
-                canUndo = strokes.isNotEmpty() && st.holderOf(key) == null,
-                onUndo = { rt.editNotes(key, strokes.dropLast(1)) },
-                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
-            )
-        }
-
-        if (s.set == null) {
-            Text(
-                "No PDF open. Tap the middle of the screen for the toolbar.",
-                Modifier.align(Alignment.Center).padding(32.dp),
-            )
-        }
-
-        StatusDots(st, Modifier.align(Alignment.TopEnd).padding(6.dp))
-
-        if (showBar) {
-            // Title and buttons on separate lines, so a long PDF name fits on narrow screens too.
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xCC000000))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Text(s.set?.name ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Text(pageSummary(st), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(6.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { picker.launch(arrayOf("application/pdf")) }) { Text("Open PDF") }
-                    Button(onClick = { folderPicker.launch(null) }) { Text("Open folder") }
+    // No edge swipe: it would clash with the pen and with page turns. Open by tap, close by swipe or tap outside.
+    ModalNavigationDrawer(
+        drawerState = drawer,
+        gesturesEnabled = drawer.isOpen,
+        drawerContent = {
+            ModalDrawerSheet {
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
+                    Column(Modifier.padding(horizontal = 28.dp, vertical = 8.dp)) {
+                        Text(s.set?.name ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                        Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     s.set?.let { set ->
                         if (s.folder != null || set.songs.size > 1) {
                             val count = if (set.shownSongs == set.songs.size) "${set.songs.size}" else "${set.shownSongs}/${set.songs.size}"
-                            Button(onClick = { showSongs = true }) { Text("Songs ($count)") }
+                            MenuItem("Songs ($count)") { menu { showSongs = true } }
                         }
                     }
-                    Button(onClick = { showScreens = true }) { Text("Screens (${s.arrangement.size})") }
-                    TextButton(onClick = onLeaveRole) { Text("Change role") }
-                    TextButton(onClick = { showAbout = true }) { Text("?") }
+                    MenuItem("Screens (${s.arrangement.size})") { menu { showScreens = true } }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    MenuItem("Open PDF") { menu { picker.launch(arrayOf("application/pdf")) } }
+                    MenuItem("Open folder") { menu { folderPicker.launch(null) } }
+                    MenuItem("Library folder", st.library?.name ?: "Not chosen yet") { menu { libraryPicker.launch(null) } }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    MenuItem("Change role") { menu(onLeaveRole) }
+                    MenuItem("About") { menu { showAbout = true } }
                 }
             }
-        }
+        },
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pageTaps(onTap = { o, size ->
+                    when {
+                        o.x < size.width / 3f -> rt.prev()
+                        o.x > size.width * 2 / 3f -> rt.next()
+                        else -> scope.launch { drawer.open() }
+                    }
+                }),
+        ) {
+            val own = st.ownTarget
+            PageView(own?.fileId, own?.page ?: 0, rt::render) { fileId, page ->
+                val key = PageKey(fileId, page)
+                val strokes = remember(key, changes) { rt.load(key).strokes }
+                // While a secondary still holds this page's latest notes, wait for them before drawing.
+                NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes, fingers = st.tools.fingers)
+            }
+            if (own?.fileId != null && own.page > 0) {
+                val key = PageKey(own.fileId, own.page)
+                val strokes = remember(key, changes) { rt.load(key).strokes }
+                NoteToolPicker(
+                    st.tools.tool, rt::setTool, st.tools.fingers, rt::setFingers,
+                    canUndo = strokes.isNotEmpty() && st.holderOf(key) == null,
+                    onUndo = { rt.editNotes(key, strokes.dropLast(1)) },
+                    modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+                )
+            }
 
-        st.busy?.let {
-            Text(it, Modifier.align(Alignment.BottomCenter).background(Color(0xCC000000)).padding(12.dp))
+            if (s.set == null) {
+                Text("Tap ☰ to choose a set.", Modifier.align(Alignment.Center).padding(32.dp))
+            }
+
+            // A tap target only, so the pen still draws right next to it.
+            Box(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(4.dp)
+                    .size(40.dp)
+                    .background(Color(0x66000000), CircleShape)
+                    .clickable(onClickLabel = "Menu") { scope.launch { drawer.open() } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White.copy(alpha = 0.6f))
+            }
+
+            StatusDots(st, Modifier.align(Alignment.TopEnd).padding(6.dp))
+
+            st.busy?.let {
+                Text(it, Modifier.align(Alignment.BottomCenter).background(Color(0xCC000000)).padding(12.dp))
+            }
         }
     }
 
@@ -172,6 +202,22 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
             confirmButton = { TextButton(onClick = rt::clearMessage) { Text("OK") } },
         )
     }
+}
+
+/** A drawer item, with an optional second line. */
+@Composable
+private fun MenuItem(label: String, subtitle: String? = null, onClick: () -> Unit) {
+    NavigationDrawerItem(
+        label = {
+            Column {
+                Text(label)
+                subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+        },
+        selected = false,
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 12.dp),
+    )
 }
 
 private fun pageSummary(st: ControllerState): String {
