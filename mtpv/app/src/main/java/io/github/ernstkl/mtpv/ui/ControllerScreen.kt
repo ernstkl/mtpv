@@ -58,6 +58,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     var showBar by remember { mutableStateOf(s.fileId == null) }
     var showScreens by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    val changes by rt.notesChanges.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(rt::openPdf)
     }
@@ -76,12 +77,20 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     ) {
         PageView(s.fileId, st.ownPage, rt::render) { fileId, page ->
             val key = PageKey(fileId, page)
-            val changes by rt.notesChanges.collectAsStateWithLifecycle()
             val strokes = remember(key, changes) { rt.load(key).strokes }
             // While a secondary still holds this page's latest notes, wait for them before drawing.
             NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes, fingers = st.tools.fingers)
         }
-        if (s.fileId != null && st.ownPage > 0) NoteToolPicker(st.tools.tool, rt::setTool, st.tools.fingers, rt::setFingers, Modifier.align(Alignment.BottomStart).padding(8.dp))
+        if (s.fileId != null && st.ownPage > 0) {
+            val key = PageKey(s.fileId, st.ownPage)
+            val strokes = remember(key, changes) { rt.load(key).strokes }
+            NoteToolPicker(
+                st.tools.tool, rt::setTool, st.tools.fingers, rt::setFingers,
+                canUndo = strokes.isNotEmpty() && st.holderOf(key) == null,
+                onUndo = { rt.editNotes(key, strokes.dropLast(1)) },
+                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+            )
+        }
 
         if (s.fileId == null) {
             Text(

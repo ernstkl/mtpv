@@ -8,8 +8,11 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -27,13 +30,16 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke as StrokeStyle
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -155,9 +161,9 @@ private fun DrawScope.drawNote(tool: Tool, color: Int, width: Float, points: Flo
 }
 
 /**
- * Small tool picker: tap the dot to open, then pick pen colour, marker or eraser. The selected tool
- * keeps its thick ring, open or closed. Left of it, set apart, the square finger switch turns finger
- * drawing on (green) and off (grey, crossed out) with one tap.
+ * Tool bar: the square finger switch turns finger drawing on (green) and off (grey, crossed out);
+ * then pen colours, marker and eraser, the selected one underlined, each picked with one tap; last
+ * the undo button, which removes the page's last stroke, whoever drew it; dimmed on an empty page.
  */
 @Composable
 fun NoteToolPicker(
@@ -165,9 +171,10 @@ fun NoteToolPicker(
     onTool: (NoteTool) -> Unit,
     fingers: Boolean,
     onFingers: (Boolean) -> Unit,
+    canUndo: Boolean,
+    onUndo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var open by remember { mutableStateOf(false) }
     Row(
         modifier
             .background(Color(0x99000000), RoundedCornerShape(20.dp))
@@ -181,7 +188,7 @@ fun NoteToolPicker(
                 .size(28.dp)
                 .alpha(if (fingers) 1f else 0.6f)
                 .background(if (fingers) Color(0xFF2E7D32) else Color.DarkGray, square)
-                .border(if (fingers) 3.dp else 1.dp, Color.White, square)
+                .border(1.dp, Color.White, square)
                 .drawWithContent {
                     drawContent()
                     if (!fingers) {
@@ -194,23 +201,57 @@ fun NoteToolPicker(
         ) {
             Text("👆", color = Color.White, fontSize = 16.sp)
         }
-        Box(Modifier.size(width = 1.dp, height = 24.dp).background(Color.Gray))
+        Separator()
 
-        val choices = if (open) NoteTool.entries else listOf(tool)
-        choices.forEach { t ->
-            Box(
-                Modifier
-                    .size(28.dp)
-                    .background(Color(t.color), CircleShape)
-                    .border(if (t == tool) 3.dp else 1.dp, Color.White, CircleShape)
-                    .clickable {
-                        if (open) onTool(t)
-                        open = !open
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (t == NoteTool.ERASER) Text("⌫", color = Color.Black, fontSize = 14.sp)
+        NoteTool.entries.forEach { t ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .background(Color(t.color), CircleShape)
+                        .border(1.dp, Color.White, CircleShape)
+                        .drawWithContent {
+                            drawContent()
+                            if (t == NoteTool.ERASER) drawEraser()
+                        }
+                        .clickable { onTool(t) },
+                )
+                Spacer(Modifier.height(3.dp))
+                Box(
+                    Modifier
+                        .size(width = 22.dp, height = 4.dp)
+                        .background(if (t == tool) Color.White else Color.Transparent, RoundedCornerShape(2.dp)),
+                )
             }
         }
+        Separator()
+
+        Box(
+            Modifier
+                .size(28.dp)
+                .alpha(if (canUndo) 1f else 0.35f)
+                .background(Color.DarkGray, CircleShape)
+                .border(1.dp, Color.White, CircleShape)
+                .clickable(enabled = canUndo, onClick = onUndo),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("↶", color = Color.White, fontSize = 18.sp)
+        }
+    }
+}
+
+@Composable
+private fun Separator() = Box(Modifier.size(width = 1.dp, height = 24.dp).background(Color.Gray))
+
+/** A tilted rubber: pink tip on the left, blue sleeve on the right. */
+private fun DrawScope.drawEraser() {
+    val w = size.width * 0.66f
+    val h = size.height * 0.32f
+    val topLeft = Offset((size.width - w) / 2, (size.height - h) / 2)
+    val corner = CornerRadius(2.dp.toPx())
+    rotate(-35f) {
+        drawRoundRect(Color(0xFF90CAF9), topLeft, Size(w, h), corner)
+        drawRoundRect(Color(0xFFF48FB1), topLeft, Size(w * 0.4f, h), corner)
+        drawRoundRect(Color.Black, topLeft, Size(w, h), corner, style = StrokeStyle(width = 1.dp.toPx()))
     }
 }

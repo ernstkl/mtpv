@@ -52,7 +52,8 @@ object ToolSync {
 /**
  * One handwritten stroke. Coordinates are relative to the page (0..1 on each axis), and [width] is
  * relative to the page width, so notes land in the same place on screens of any size. Two strokes
- * are the same stroke if they have the same [id].
+ * are the same stroke if they have the same [id]. A page's strokes are kept in the order they were
+ * drawn, on whichever screen, so undo removes the last one.
  */
 class Stroke(val id: Long, val tool: Tool, val color: Int, val width: Float, val points: FloatArray) {
     override fun equals(other: Any?) = other is Stroke && other.id == id
@@ -99,3 +100,4 @@ object NotesGeometry {
         return hypot(px - (ax + t * dx), py - (ay + t * dy))
     }
 }
+

@@ -50,6 +50,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
     var showInfo by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     val tools by rt.tools.collectAsStateWithLifecycle()
+    val notes by rt.notes.collectAsStateWithLifecycle()
 
     Box(
         Modifier
@@ -66,7 +67,6 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
             ),
     ) {
         PageView(display.fileId, display.page, rt::render) { fileId, page ->
-            val notes by rt.notes.collectAsStateWithLifecycle()
             if (notes.fileId == fileId && notes.page == page) {
                 NotesLayer(
                     PageKey(fileId, page), notes.strokes, tools.tool, enabled = true,
@@ -74,8 +74,16 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                 )
             }
         }
-        if (display.fileId != null && display.page > 0) {
-            NoteToolPicker(tools.tool, rt::pickTool, tools.fingers, rt::setFingers, Modifier.align(Alignment.BottomStart).padding(8.dp))
+        val shownFile = display.fileId
+        if (shownFile != null && display.page > 0) {
+            val key = PageKey(shownFile, display.page)
+            val shown = notes.fileId == key.fileId && notes.page == key.page
+            NoteToolPicker(
+                tools.tool, rt::pickTool, tools.fingers, rt::setFingers,
+                canUndo = shown && notes.strokes.isNotEmpty(),
+                onUndo = { rt.editNotes(key, notes.strokes.dropLast(1)) },
+                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+            )
         }
 
         if (display.fileId == null) {

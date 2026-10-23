@@ -34,10 +34,12 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10
 6. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
    page and arrangement and reconnects; secondaries keep the last page until it does.
 
-Notes: write with the stylus on any screen; fingers keep turning pages. The dot in the bottom-left
-corner picks black/red/blue pen, yellow marker or eraser (whole strokes; the stylus eraser end works
-too). Without a stylus, tap the square finger switch left of the dot (green = on): a finger then
-draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
+Notes: write with the stylus on any screen; fingers keep turning pages. The tool bar in the
+bottom-left corner picks black/red/blue pen, yellow marker or eraser with one tap; the selected one
+is underlined. The eraser removes whole strokes; the stylus eraser end works too. ↶ removes the
+page's strokes one by one, newest first, whichever screen they were drawn on (erasing is not
+undone). Without a stylus, tap the square finger switch at the left of the bar (green = on): a
+finger then draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
 Tool and finger switch are the same on all screens, like one big sheet of paper: what you pick on
 one screen is picked on all of them. The stylus draws on every screen whatever the switch says. Notes belong to the PDF's content: a changed PDF starts without notes.
 
@@ -74,5 +76,5 @@ on screen, so a secondary keeps serving and the controller keeps receiving page 
 
 ## Not in this version
 
-Encryption (tokens travel in plain HTTP on the local network), undo, exporting a PDF with the notes
+Encryption (tokens travel in plain HTTP on the local network), redo, exporting a PDF with the notes
 burnt in, NFC as a pairing shortcut, and Wi-Fi Direct.
