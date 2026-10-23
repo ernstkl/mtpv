@@ -70,6 +70,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val scope = rememberCoroutineScope()
     var showScreens by remember { mutableStateOf(false) }
     var showSongs by remember { mutableStateOf(false) }
+    var showSets by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     val changes by rt.notesChanges.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -99,6 +100,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                         Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
                     }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    MenuItem("Sets…") { menu { showSets = true } }
                     s.set?.let { set ->
                         if (s.folder != null || set.songs.size > 1) {
                             val count = if (set.shownSongs == set.songs.size) "${set.songs.size}" else "${set.shownSongs}/${set.songs.size}"
@@ -173,6 +175,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     }
 
     if (showScreens) ScreensDialog(rt, st) { showScreens = false }
+    if (showSets) SetsDialog(rt, st, onChooseLibrary = { libraryPicker.launch(null) }) { showSets = false }
     if (showSongs) SongsDialog(rt, st) { showSongs = false }
     if (showAbout) AboutDialog { showAbout = false }
 

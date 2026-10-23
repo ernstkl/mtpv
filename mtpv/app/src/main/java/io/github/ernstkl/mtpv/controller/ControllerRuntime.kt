@@ -47,15 +47,19 @@ data class PairingUi(val uuid: String, val name: String, val code: String?)
 /**
  * The library as the Sets dialog shows it. [path] runs from the library folder down to the folder
  * shown; [level] is null while it is read or if it cannot be read ([error]). [openPath] holds the
- * document IDs of the open set's folder and the folders above it, to mark the way there.
+ * document IDs of the folders above the open set's folder and, last, that folder itself, to mark
+ * the way there.
  */
 data class LibraryUi(
     val path: List<LibraryEntry>,
     val level: LibraryLevel? = null,
     val error: String? = null,
-    val openPath: Set<String> = emptySet(),
+    val openPath: List<String> = emptyList(),
 ) {
     val name get() = path.firstOrNull()?.name
+
+    /** The folder shown is the open set. */
+    val showsOpenSet get() = openPath.isNotEmpty() && path.lastOrNull()?.documentId == openPath.last()
 }
 
 data class ControllerState(
@@ -279,11 +283,11 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     /** The open set's folder and, if the provider can tell, the library folders above it. */
-    private fun openPath(tree: Uri): Set<String> {
-        val open = _state.value.session.folder?.let { Folders.folderOf(Uri.parse(it)) } ?: return emptySet()
-        if (open.authority != tree.authority) return emptySet()
+    private fun openPath(tree: Uri): List<String> {
+        val open = _state.value.session.folder?.let { Folders.folderOf(Uri.parse(it)) } ?: return emptyList()
+        if (open.authority != tree.authority) return emptyList()
         val id = DocumentsContract.getDocumentId(open)
-        return folders.pathTo(tree, id)?.toSet() ?: setOf(id)
+        return folders.pathTo(tree, id) ?: listOf(id)
     }
 
     // --- songs ---
