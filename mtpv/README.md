@@ -12,7 +12,7 @@ Architecture overview: [`../CONCEPT.md`](../CONCEPT.md).
     ./gradlew testDebugUnitTest
     adb install -r app/build/outputs/apk/debug/app-debug.apk
 
-Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 11+ (minSdk 30); the controller role needs Android 14 (mDNS `registerServiceInfoCallback`).
+Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10+ (minSdk 29); the controller role needs Android 14 (mDNS `registerServiceInfoCallback`).
 
 ## Use
 
