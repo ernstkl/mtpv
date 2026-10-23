@@ -58,6 +58,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val s = st.session
     var showBar by remember { mutableStateOf(s.fileId == null) }
     var showScreens by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     var tool by rememberSaveable { mutableStateOf(NoteTool.PEN_BLACK) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(rt::openPdf)
@@ -108,6 +109,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     Button(onClick = { picker.launch(arrayOf("application/pdf")) }) { Text("Open PDF") }
                     Button(onClick = { showScreens = true }) { Text("Screens (${s.arrangement.size})") }
                     TextButton(onClick = onLeaveRole) { Text("Change role") }
+                    TextButton(onClick = { showAbout = true }) { Text("?") }
                 }
             }
         }
@@ -118,6 +120,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     }
 
     if (showScreens) ScreensDialog(rt, st) { showScreens = false }
+    if (showAbout) AboutDialog { showAbout = false }
 
     st.pairing?.let { p ->
         AlertDialog(

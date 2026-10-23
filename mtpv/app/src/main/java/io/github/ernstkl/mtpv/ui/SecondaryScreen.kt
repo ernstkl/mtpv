@@ -48,6 +48,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
     }
     val connected = now - lastContact < 10_000
     var showInfo by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     var tool by rememberSaveable { mutableStateOf(NoteTool.PEN_BLACK) }
 
     Box(
@@ -105,9 +106,15 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                 }
             },
             confirmButton = { TextButton(onClick = { showInfo = false }) { Text("Close") } },
-            dismissButton = { TextButton(onClick = onLeaveRole) { Text("Change role") } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showInfo = false; showAbout = true }) { Text("About") }
+                    TextButton(onClick = onLeaveRole) { Text("Change role") }
+                }
+            },
         )
     }
+    if (showAbout) AboutDialog { showAbout = false }
 
     // A controller asks to be paired: whoever can tap this screen decides.
     val requests by rt.pairing.requests.collectAsStateWithLifecycle()

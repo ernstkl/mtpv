@@ -50,6 +50,11 @@ class Prefs(private val context: Context) {
         get() = runCatching { Role.valueOf(sp.getString("role", null)!!) }.getOrDefault(Role.NONE)
         set(value) = sp.edit().putString("role", value.name).apply()
 
+    /** The about dialog opens by itself until it has been closed once. */
+    var aboutShown: Boolean
+        get() = sp.getBoolean("aboutShown", false)
+        set(value) = sp.edit().putBoolean("aboutShown", value).apply()
+
     var lastVersion: Long
         get() = sp.getLong("lastVersion", 0)
         set(value) = sp.edit().putLong("lastVersion", value).apply()

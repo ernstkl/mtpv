@@ -22,10 +22,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -38,6 +42,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.ernstkl.mtpv.KeepAliveService
 import io.github.ernstkl.mtpv.MtpvApp
+import io.github.ernstkl.mtpv.Prefs
 import io.github.ernstkl.mtpv.Role
 import io.github.ernstkl.mtpv.controllerSupported
 import kotlinx.coroutines.launch
@@ -60,7 +65,7 @@ class MainActivity : ComponentActivity() {
                 Surface(Modifier.fillMaxSize()) {
                     val role by app.role.collectAsStateWithLifecycle()
                     when (role) {
-                        Role.NONE -> RoleChooser(app::setRole)
+                        Role.NONE -> RoleChooser(app.prefs, app::setRole)
                         Role.CONTROLLER -> app.controller?.let { ControllerScreen(it) { app.setRole(Role.NONE) } }
                         Role.SECONDARY -> app.secondary?.let { SecondaryScreen(it) { app.setRole(Role.NONE) } }
                     }
@@ -133,13 +138,15 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun RoleChooser(onChoose: (Role) -> Unit) {
+private fun RoleChooser(prefs: Prefs, onChoose: (Role) -> Unit) {
+    var showAbout by remember { mutableStateOf(!prefs.aboutShown) }
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("MTPV", style = MaterialTheme.typography.headlineLarge)
+        Text("Multi-Tablet PDF Viewer")
         Spacer(Modifier.height(8.dp))
         Text("What should this tablet do? The app remembers the choice.")
         Spacer(Modifier.height(32.dp))
@@ -153,6 +160,14 @@ private fun RoleChooser(onChoose: (Role) -> Unit) {
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = { onChoose(Role.SECONDARY) }, Modifier.width(320.dp)) {
             Text("Secondary: show one page")
+        }
+        Spacer(Modifier.height(16.dp))
+        TextButton(onClick = { showAbout = true }) { Text("About / How it works") }
+    }
+    if (showAbout) {
+        AboutDialog {
+            showAbout = false
+            prefs.aboutShown = true
         }
     }
 }
