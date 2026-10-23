@@ -126,7 +126,8 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     Button(onClick = { folderPicker.launch(null) }) { Text("Open folder") }
                     s.set?.let { set ->
                         if (s.folder != null || set.songs.size > 1) {
-                            Button(onClick = { showSongs = true }) { Text("Songs (${set.songs.size})") }
+                            val count = if (set.shownSongs == set.songs.size) "${set.songs.size}" else "${set.shownSongs}/${set.songs.size}"
+                            Button(onClick = { showSongs = true }) { Text("Songs ($count)") }
                         }
                     }
                     Button(onClick = { showScreens = true }) { Text("Screens (${s.arrangement.size})") }
@@ -178,9 +179,10 @@ private fun pageSummary(st: ControllerState): String {
     val set = s.set ?: return "No PDF open"
     val last = minOf(s.start + s.arrangement.size - 1, st.totalPages)
     val pages = "Pages ${s.start}–$last of ${st.totalPages}"
+    if (set.shownSongs == 0) return "All songs are left out; tick them under Songs"
     if (set.songs.size < 2) return pages
     val i = set.songIndexAt(s.start)
-    return "Song ${i + 1} of ${set.songs.size}: ${songTitle(set.songs[i].name)} · $pages"
+    return "Song ${set.numberOf(i)} of ${set.shownSongs}: ${songTitle(set.songs[i].name)} · $pages"
 }
 
 /** One dot per secondary, in screen order: green shows the right page, yellow is busy, red is unreachable. */

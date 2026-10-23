@@ -1,31 +1,48 @@
 package io.github.ernstkl.mtpv.core
 
-/** One PDF of a set. [name] is its file name, which also keys its place in the stored order. */
-data class Song(val name: String, val fileId: String, val pageCount: Int)
+/**
+ * One PDF of a set. [name] is its file name, which also keys its place in the stored order.
+ * An [excluded] song stays in the set's list but adds no pages to the stream.
+ */
+data class Song(val name: String, val fileId: String, val pageCount: Int, val excluded: Boolean = false) {
+    val shownPages get() = if (excluded) 0 else pageCount
+}
 
 /**
  * Songs shown as one stream of pages, as if they were one PDF: page 1 is the first page of the
  * first song, and the pages of the next song follow right after the last page of the one before.
- * Pages are 1-based; a single PDF is a set of one song.
+ * Pages are 1-based; a single PDF is a set of one song. Excluded songs are skipped.
  */
 class SongSet private constructor(val name: String, val songs: List<Song>) {
     /** Global page of each song's first page, plus one entry past the end. */
     private val firsts: IntArray = IntArray(songs.size + 1).also { f ->
         f[0] = 1
-        songs.forEachIndexed { i, s -> f[i + 1] = f[i] + s.pageCount }
+        songs.forEachIndexed { i, s -> f[i + 1] = f[i] + s.shownPages }
     }
 
     val totalPages: Int get() = firsts.last() - 1
 
-    /** Global page of the first page of song [index]. */
+    /** Global page of the first page of song [index]; for an excluded song, that of the next song shown. */
     fun firstPageOf(index: Int): Int = firsts[index]
 
-    /** Song that global [page] belongs to, or -1 past the end. */
+    /** Song that global [page] belongs to, or -1 past the end. Never an excluded song. */
     fun songIndexAt(page: Int): Int {
         if (page !in 1..totalPages) return -1
-        val i = firsts.binarySearch(page)
-        return if (i >= 0) i else -i - 2
+        // The last song starting at or before page: an excluded song starts where the next one does.
+        var lo = 0
+        var hi = songs.size - 1
+        while (lo < hi) {
+            val mid = (lo + hi + 1) / 2
+            if (firsts[mid] <= page) lo = mid else hi = mid - 1
+        }
+        return lo
     }
+
+    /** Position of song [index] among the songs shown, 1-based; 0 for an excluded song. */
+    fun numberOf(index: Int): Int =
+        if (songs[index].excluded) 0 else (0..index).count { !songs[it].excluded }
+
+    val shownSongs: Int get() = songs.count { !it.excluded }
 
     /** File and page within it shown at global [page], or null for a blank screen. */
     fun locate(page: Int): PageKey? {
@@ -35,11 +52,14 @@ class SongSet private constructor(val name: String, val songs: List<Song>) {
 
     /** Global page that shows [key], or 0 if the set does not contain it. The first song with that file wins. */
     fun pageOf(key: PageKey): Int {
-        val i = songs.indexOfFirst { it.fileId == key.fileId && key.page in 1..it.pageCount }
+        val i = songs.indexOfFirst { it.fileId == key.fileId && key.page in 1..it.shownPages }
         return if (i < 0) 0 else firsts[i] + key.page - 1
     }
 
     fun move(index: Int, delta: Int): SongSet = SongSet(name, songs.moved(index, delta))
+
+    fun exclude(index: Int, excluded: Boolean): SongSet =
+        SongSet(name, songs.mapIndexed { i, s -> if (i == index) s.copy(excluded = excluded) else s })
 
     override fun equals(other: Any?) = other is SongSet && name == other.name && songs == other.songs
 

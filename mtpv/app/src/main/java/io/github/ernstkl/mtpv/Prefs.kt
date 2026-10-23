@@ -112,13 +112,17 @@ class Prefs(private val context: Context) {
 
     private fun setToJson(set: SongSet): JSONObject {
         val songs = JSONArray()
-        set.songs.forEach { songs.put(JSONObject().put("name", it.name).put("fileId", it.fileId).put("pageCount", it.pageCount)) }
+        set.songs.forEach {
+            songs.put(JSONObject().put("name", it.name).put("fileId", it.fileId).put("pageCount", it.pageCount).put("excluded", it.excluded))
+        }
         return JSONObject().put("name", set.name).put("songs", songs)
     }
 
     private fun setFromJson(o: JSONObject): SongSet {
         val songs = o.getJSONArray("songs").let { a ->
-            List(a.length()) { a.getJSONObject(it) }.map { Song(it.getString("name"), it.getString("fileId"), it.getInt("pageCount")) }
+            List(a.length()) { a.getJSONObject(it) }.map {
+                Song(it.getString("name"), it.getString("fileId"), it.getInt("pageCount"), it.optBoolean("excluded"))
+            }
         }
         return SongSet.of(o.getString("name"), songs)
     }

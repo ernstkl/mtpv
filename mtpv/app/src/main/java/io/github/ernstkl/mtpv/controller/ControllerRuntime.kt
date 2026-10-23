@@ -62,12 +62,13 @@ data class ControllerState(
     fun pageForSlot(slot: Int) = Paging.pageFor(session.start, slot, totalPages)
 
     /**
-     * File and page within it for [slot]. A blank screen past the end gets the last song's file
-     * with page 0, so it shows the empty-set sign. Null while no set is open.
+     * File and page within it for [slot]. A blank screen past the end gets the last shown song's
+     * file with page 0, so it shows the empty-set sign. Null while no set is open.
      */
     fun targetForSlot(slot: Int): Target? {
         val set = session.set ?: return null
-        return set.locate(pageForSlot(slot))?.let { Target(it.fileId, it.page) } ?: Target(set.songs.last().fileId, 0)
+        val last = set.songs.lastOrNull { !it.excluded } ?: set.songs.last()
+        return set.locate(pageForSlot(slot))?.let { Target(it.fileId, it.page) } ?: Target(last.fileId, 0)
     }
 
     /** Secondary that still holds unsaved notes of [key] and can be reached, if any. */
@@ -169,8 +170,9 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                     val f = present.getValue(n)
                     old?.unchanged(f)?.takeIf { it.pageCount == 0 || cache.has(it.fileId) } ?: copy(tree, f)
                 }
-                folders.save(tree, SetRecord(tree.toString(), name, order, stored))
-                val set = SongSet.of(name, stored.map { Song(it.file.name, it.fileId, it.pageCount) })
+                val excluded = old?.excluded.orEmpty() intersect present.keys
+                folders.save(tree, SetRecord(tree.toString(), name, order, stored, excluded))
+                val set = SongSet.of(name, stored.map { Song(it.file.name, it.fileId, it.pageCount, it.file.name in excluded) })
                 if (set.songs.isEmpty()) error("no PDFs in $name")
                 withContext(Dispatchers.Main) {
                     updateSession { s ->
@@ -202,19 +204,31 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     /** Moves a song up or down; the controller's own screen keeps its page. The order is stored for the folder. */
-    fun moveSong(index: Int, delta: Int) {
+    fun moveSong(index: Int, delta: Int) = changeSongs { it.move(index, delta) }
+
+    /**
+     * Leaves song [index] out of the stream, or takes it back in. The controller's own screen keeps
+     * its page unless that page belongs to the song left out.
+     */
+    fun excludeSong(index: Int, excluded: Boolean) = changeSongs { it.exclude(index, excluded) }
+
+    private fun changeSongs(f: (SongSet) -> SongSet) {
         updateSession { s ->
             val set = s.set ?: return@updateSession s
-            val moved = set.move(index, delta)
+            val changed = f(set)
             val self = s.arrangement.indexOf(Paging.SELF)
-            val start = set.locate(s.start + self)?.let { moved.pageOf(it) - self } ?: s.start
-            s.copy(set = moved, start = start)
+            val start = set.locate(s.start + self)?.let { changed.pageOf(it) }?.takeIf { it > 0 }?.let { it - self } ?: s.start
+            s.copy(set = changed, start = start)
         }
         val s = _state.value.session
         val tree = s.folder?.let(Uri::parse) ?: return
-        val songs = s.set?.songs?.map { it.name } ?: return
+        val songs = s.set?.songs ?: return
+        val names = songs.map { it.name }
+        val excluded = songs.filter { it.excluded }.map { it.name }.toSet()
         scope.launch(orderWrites) {
-            folders.load(tree)?.let { r -> folders.save(tree, r.copy(order = SetOrder.reordered(r.order, songs))) }
+            folders.load(tree)?.let { r ->
+                folders.save(tree, r.copy(order = SetOrder.reordered(r.order, names), excluded = excluded))
+            }
         }
     }
 

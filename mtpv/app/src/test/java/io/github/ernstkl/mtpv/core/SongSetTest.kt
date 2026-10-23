@@ -67,6 +67,39 @@ class SongSetTest {
     }
 
     @Test
+    fun excludedSongsAddNoPages() {
+        val s = set.exclude(1, true)
+        assertEquals(3, s.totalPages)
+        assertEquals(listOf(PageKey("a", 1), PageKey("a", 2), PageKey("c", 1)), (1..3).map { s.locate(it) })
+        assertEquals(listOf(0, 0, 2), (1..3).map { s.songIndexAt(it) })
+        assertEquals(listOf("A", "B", "C"), s.songs.map { it.name })
+        assertEquals(listOf(1, 0, 2), (0..2).map { s.numberOf(it) })
+        assertEquals(2, s.shownSongs)
+        assertEquals(0, s.pageOf(PageKey("b", 1)))
+        assertEquals(3, s.pageOf(PageKey("c", 1)))
+        assertEquals(set, s.exclude(1, false))
+    }
+
+    @Test
+    fun excludedAtTheEdges() {
+        val first = set.exclude(0, true)
+        assertEquals(listOf(1, 1, 1, 2), (1..4).map { first.songIndexAt(it) })
+        assertEquals(PageKey("b", 1), first.locate(1))
+        val last = set.exclude(2, true)
+        assertEquals(5, last.totalPages)
+        assertEquals(1, last.songIndexAt(5))
+        assertNull(last.locate(6))
+    }
+
+    @Test
+    fun allExcluded() {
+        val s = (0..2).fold(set) { acc, i -> acc.exclude(i, true) }
+        assertEquals(0, s.totalPages)
+        assertNull(s.locate(1))
+        assertEquals(-1, s.songIndexAt(1))
+    }
+
+    @Test
     fun equalByContent() {
         assertEquals(set, SongSet.of("Gig", set.songs.toList()))
     }

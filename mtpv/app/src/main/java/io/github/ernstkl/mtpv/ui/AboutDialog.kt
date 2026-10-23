@@ -34,7 +34,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     "every screen moves on by one page, until the last page is on the leftmost screen.")
                 Spacer(Modifier.height(12.dp))
                 Text("Song sets: put one PDF per song in a folder and tap Open folder. The songs follow each other " +
-                    "in alphabetical order, like one long PDF. Under Songs, tap a song to jump to it or change the order with ▲ ▼.")
+                    "in alphabetical order, like one long PDF. Under Songs, tap a song to jump to it, drag ≡ to change the order, untick a song to leave it out.")
                 Text("Controller: tap the middle to show the toolbar. Secondary: long-press for its address and settings. " +
                     "If a secondary isn't found, enter its address under Screens.")
                 Text("Notes: draw with a stylus; pick pen, marker or eraser in the bar at the bottom left, ↶ undoes. " +

@@ -76,7 +76,8 @@ class Folders(private val context: Context) {
                     )
                 }
             }
-            SetRecord(o.getString("treeUri"), o.getString("name"), order, files)
+            val excluded = o.optJSONArray("excluded")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty().toSet()
+            SetRecord(o.getString("treeUri"), o.getString("name"), order, files, excluded)
         }.getOrNull()
     }
 
@@ -89,6 +90,7 @@ class Folders(private val context: Context) {
             )
         }
         val o = JSONObject().put("treeUri", r.treeUri).put("name", r.name).put("order", JSONArray(r.order)).put("files", files)
+            .put("excluded", JSONArray(r.excluded.toList()))
             .put("lastOpened", System.currentTimeMillis())
         val f = file(tree)
         val tmp = File(dir, f.name + ".tmp")
