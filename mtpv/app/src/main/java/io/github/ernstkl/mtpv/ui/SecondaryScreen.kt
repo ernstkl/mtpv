@@ -51,6 +51,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
     var showInfo by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var tool by rememberSaveable { mutableStateOf(NoteTool.PEN_BLACK) }
+    var fingers by rememberSaveable { mutableStateOf(false) }
 
     Box(
         Modifier
@@ -71,12 +72,12 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
             if (notes.fileId == fileId && notes.page == page) {
                 NotesLayer(
                     PageKey(fileId, page), notes.strokes, tool, enabled = true,
-                    onChange = rt::editNotes, onPen = rt::setPenDown,
+                    onChange = rt::editNotes, onPen = rt::setPenDown, fingers = fingers,
                 )
             }
         }
         if (display.fileId != null && display.page > 0) {
-            NoteToolPicker(tool, { tool = it }, Modifier.align(Alignment.BottomStart).padding(8.dp))
+            NoteToolPicker(tool, { tool = it }, fingers, { fingers = it }, Modifier.align(Alignment.BottomStart).padding(8.dp))
         }
 
         if (display.fileId == null) {

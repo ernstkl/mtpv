@@ -35,6 +35,8 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Text("Controller: tap the middle to show the toolbar. Secondary: long-press for its address and settings. " +
                     "If a secondary isn't found, enter its address under Screens.")
+                Text("Notes: draw with a stylus; pick pen, marker or eraser with the dot at the bottom left. " +
+                    "Without a stylus, tap 👆 next to it (green = on) to draw with a finger; taps on the page then no longer turn it.")
                 Text("The controller needs Android 14, secondaries Android 11.")
                 Spacer(Modifier.height(12.dp))
                 Text(

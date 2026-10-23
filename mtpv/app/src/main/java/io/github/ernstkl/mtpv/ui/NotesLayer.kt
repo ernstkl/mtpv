@@ -25,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
@@ -53,10 +55,11 @@ enum class NoteTool(val tool: Tool?, val color: Long, val width: Float) {
 }
 
 /**
- * Notes over a page; it must exactly cover the rendered page. Only the stylus draws (its eraser end,
- * or the eraser tool, removes whole strokes), so fingers still turn pages underneath. Each change
+ * Notes over a page; it must exactly cover the rendered page. Normally only the stylus draws (its eraser
+ * end, or the eraser tool, removes whole strokes), so fingers still turn pages underneath. With
+ * [fingers], a finger draws like the stylus, and taps on the page no longer turn it. Each change
  * names the page the stroke started on, even if the screen has moved to another page meanwhile.
- * [onPen] reports whether the stylus is down.
+ * [onPen] reports whether the stylus (or drawing finger) is down.
  */
 @OptIn(ExperimentalComposeUiApi::class) // historical points: smooth strokes at high stylus sample rates
 @Composable
@@ -67,12 +70,14 @@ fun NotesLayer(
     enabled: Boolean,
     onChange: (PageKey, List<Stroke>) -> Unit,
     modifier: Modifier = Modifier,
+    fingers: Boolean = false,
     onPen: (Boolean) -> Unit = {},
 ) {
     val currentPage by rememberUpdatedState(page)
     val current by rememberUpdatedState(strokes)
     val pen by rememberUpdatedState(onPen)
     val currentTool by rememberUpdatedState(tool)
+    val withFingers by rememberUpdatedState(fingers)
     val change by rememberUpdatedState(onChange)
     val live = remember { mutableStateListOf<Float>() }
     var liveTool by remember { mutableStateOf<NoteTool?>(null) }
@@ -84,7 +89,9 @@ fun NotesLayer(
                 if (!enabled) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    if (down.type != PointerType.Stylus && down.type != PointerType.Eraser) return@awaitEachGesture
+                    val draws = down.type == PointerType.Stylus || down.type == PointerType.Eraser ||
+                        (withFingers && down.type == PointerType.Touch)
+                    if (!draws) return@awaitEachGesture
                     down.consume()
                     val w = size.width.toFloat()
                     val h = size.height.toFloat()
@@ -155,9 +162,19 @@ private fun DrawScope.drawNote(tool: Tool, color: Int, width: Float, points: Flo
     drawPath(path, c, style = StrokeStyle(width = px, cap = StrokeCap.Round, join = StrokeJoin.Round), blendMode = blend)
 }
 
-/** Small tool picker for the stylus: tap the dot to open, then pick pen colour, marker or eraser. */
+/**
+ * Small tool picker: tap the dot to open, then pick pen colour, marker or eraser. The selected tool
+ * keeps its thick ring, open or closed. Left of it, set apart, the square finger switch turns finger
+ * drawing on (green) and off (grey, crossed out) with one tap.
+ */
 @Composable
-fun NoteToolPicker(tool: NoteTool, onTool: (NoteTool) -> Unit, modifier: Modifier = Modifier) {
+fun NoteToolPicker(
+    tool: NoteTool,
+    onTool: (NoteTool) -> Unit,
+    fingers: Boolean,
+    onFingers: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var open by remember { mutableStateOf(false) }
     Row(
         modifier
@@ -166,13 +183,34 @@ fun NoteToolPicker(tool: NoteTool, onTool: (NoteTool) -> Unit, modifier: Modifie
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val square = RoundedCornerShape(4.dp)
+        Box(
+            Modifier
+                .size(28.dp)
+                .alpha(if (fingers) 1f else 0.6f)
+                .background(if (fingers) Color(0xFF2E7D32) else Color.DarkGray, square)
+                .border(if (fingers) 3.dp else 1.dp, Color.White, square)
+                .drawWithContent {
+                    drawContent()
+                    if (!fingers) {
+                        drawLine(Color(0xFFE53935), Offset(size.width * 0.2f, size.height * 0.8f),
+                            Offset(size.width * 0.8f, size.height * 0.2f), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+                    }
+                }
+                .clickable { onFingers(!fingers) },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("👆", color = Color.White, fontSize = 16.sp)
+        }
+        Box(Modifier.size(width = 1.dp, height = 24.dp).background(Color.Gray))
+
         val choices = if (open) NoteTool.entries else listOf(tool)
         choices.forEach { t ->
             Box(
                 Modifier
                     .size(28.dp)
                     .background(Color(t.color), CircleShape)
-                    .border(if (t == tool && open) 3.dp else 1.dp, Color.White, CircleShape)
+                    .border(if (t == tool) 3.dp else 1.dp, Color.White, CircleShape)
                     .clickable {
                         if (open) onTool(t)
                         open = !open
