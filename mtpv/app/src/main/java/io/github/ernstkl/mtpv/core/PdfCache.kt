@@ -75,7 +75,7 @@ class PdfCache(context: Context) {
 
     companion object {
         private val ID = Regex("[0-9a-f]{64}")
-        private const val MAX_FILES = 30
+        private const val MAX_FILES = 100
         private const val MAX_BYTES = 2L * 1024 * 1024 * 1024
 
         fun isValidId(id: String) = ID.matches(id)

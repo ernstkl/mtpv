@@ -7,13 +7,18 @@ import io.github.ernstkl.mtpv.FrontNotification
 import io.github.ernstkl.mtpv.KnownSecondary
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.controllerSupported
+import io.github.ernstkl.mtpv.core.FolderFile
 import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PageKey
+import io.github.ernstkl.mtpv.core.PageRenderer
 import io.github.ernstkl.mtpv.core.Paging
+import io.github.ernstkl.mtpv.core.SetOrder
+import io.github.ernstkl.mtpv.core.SetRecord
 import io.github.ernstkl.mtpv.core.Song
 import io.github.ernstkl.mtpv.core.SongSet
+import io.github.ernstkl.mtpv.core.StoredFile
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.moved
@@ -78,6 +83,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private val prefs = app.prefs
     private val cache = app.cache
     private val notes = NotesStore(app)
+    private val folders = Folders(app)
     val notesChanges: StateFlow<Long> = notes.changes
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val versions = VersionClock({ prefs.lastVersion }, { prefs.lastVersion = it })
@@ -131,7 +137,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 val set = SongSet.of(name, listOf(Song(name, id, count)))
                 if (set.songs.isEmpty()) error("the PDF has no pages")
                 withContext(Dispatchers.Main) {
-                    updateSession { it.copy(set = set, start = 1) }
+                    updateSession { it.copy(set = set, folder = null, start = 1) }
                 }
                 cache.evict(setOf(id))
             } catch (e: Exception) {
@@ -140,6 +146,52 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 _state.update { it.copy(busy = null) }
             }
         }
+    }
+
+    /**
+     * The PDFs in folder [tree] become a set, in the order stored for that folder: files still
+     * there keep their places, new ones go to the end. Files that are no readable PDF or have no
+     * pages are left out quietly.
+     */
+    fun openFolder(tree: Uri) {
+        scope.launch {
+            _state.update { it.copy(busy = "Reading folder…") }
+            try {
+                folders.keepAccess(tree)
+                val name = folders.name(tree)
+                val present = folders.pdfs(tree).associateBy { it.name }
+                val old = folders.load(tree)
+                val order = SetOrder.merge(old?.order.orEmpty(), present.keys)
+                val stored = order.mapIndexedNotNull { i, n ->
+                    _state.update { it.copy(busy = "Loading ${i + 1} of ${order.size}…") }
+                    val f = present.getValue(n)
+                    old?.unchanged(f)?.takeIf { it.pageCount == 0 || cache.has(it.fileId) } ?: copy(tree, f)
+                }
+                folders.save(tree, SetRecord(tree.toString(), name, order, stored))
+                val set = SongSet.of(name, stored.map { Song(it.file.name, it.fileId, it.pageCount) })
+                if (set.songs.isEmpty()) error("no PDFs in $name")
+                withContext(Dispatchers.Main) {
+                    updateSession { s ->
+                        // Reading the same folder again keeps the page on the first screen, if it is still there.
+                        val same = s.folder == tree.toString()
+                        val first = if (same) s.set?.locate(s.start)?.let(set::pageOf) ?: 0 else 0
+                        s.copy(set = set, folder = tree.toString(), start = first.coerceAtLeast(1))
+                    }
+                }
+                cache.evict(set.songs.map { it.fileId }.toSet())
+            } catch (e: Exception) {
+                showMessage("Could not open the folder: ${e.message}")
+            } finally {
+                _state.update { it.copy(busy = null) }
+            }
+        }
+    }
+
+    /** Copies [f] into the cache; null if it cannot be read now, page count 0 if it is no PDF. */
+    private fun copy(tree: Uri, f: FolderFile): StoredFile? {
+        val id = runCatching { folders.open(tree, f).use { cache.store(it) } }.getOrNull() ?: return null
+        val count = runCatching { PageRenderer(cache.file(id)).use { it.pageCount } }.getOrDefault(0)
+        return StoredFile(f, id, count)
     }
 
     private fun displayName(uri: Uri): String =

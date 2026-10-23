@@ -25,6 +25,10 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10
    controller can be in any position) and lets you add a secondary by IP if mDNS is blocked.
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
    Then **Open PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
+   For a song set, collect one PDF per song in a folder and tap **Open folder**: the PDFs follow each
+   other like one long PDF, in alphabetical order (numbers by value, so "2" comes before "10"). Opening
+   the same folder again keeps its order; files added since go to the end, removed ones drop out.
+   Files without pages are left out. Subfolders are not included.
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
@@ -54,7 +58,11 @@ On a secondary, long-press for its address and to change the role.
   and tapping Allow there issues a random token. Every other request needs it
   (`Authorization: Bearer …`). Paired controllers can be removed on the secondary (long press).
 - PDFs are identified by SHA-256 and sent once; both roles keep them in `filesDir/pdfs`
-  (30 files / 2 GB, least recently used are removed first).
+  (100 files / 2 GB, least recently used are removed first; the controller never removes the open set's files).
+- A folder is read through the Storage Access Framework (read access only, kept across restarts). Its
+  PDFs are copied into the cache; `filesDir/sets/<hash of the folder's document ID>.json` keeps the
+  song order and each file's size and date, so unchanged files are not read again. Secondaries only
+  ever see single files: the controller works out each screen's file and page.
 - Every display command carries a version (strictly increasing, persisted); secondaries ignore older ones.
 - Notes are vector strokes in page-relative coordinates. The controller keeps the authoritative copy
   (`filesDir/notes/<fileId>/<page>.json`) and sends a page's strokes with it. A secondary saves edits

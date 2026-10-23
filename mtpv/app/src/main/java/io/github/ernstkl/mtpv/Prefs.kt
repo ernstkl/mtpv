@@ -28,9 +28,13 @@ data class KnownSecondary(val uuid: String, val name: String, val host: String?,
 /** A controller this secondary accepts commands from (secondary side). */
 data class PairedController(val uuid: String, val name: String, val token: String)
 
-/** What the controller restores at the next start. [start] is a page in the stream of the set's pages. */
+/**
+ * What the controller restores at the next start. [start] is a page in the stream of the set's
+ * pages; [folder] is the tree URI the set was read from, null for a single PDF.
+ */
 data class ControllerSession(
     val set: SongSet?,
+    val folder: String?,
     val start: Int,
     val arrangement: List<String>,
     val known: Map<String, KnownSecondary>,
@@ -82,6 +86,7 @@ class Prefs(private val context: Context) {
         }.orEmpty().associateBy { it.uuid }
         return ControllerSession(
             set = sp.getString("set", null)?.let { runCatching { setFromJson(JSONObject(it)) }.getOrNull() },
+            folder = sp.getString("folder", null),
             start = sp.getInt("start", 1),
             arrangement = arrangement,
             known = known,
@@ -98,6 +103,7 @@ class Prefs(private val context: Context) {
         }
         sp.edit()
             .putString("set", s.set?.let { setToJson(it).toString() })
+            .putString("folder", s.folder)
             .putInt("start", s.start)
             .putString("arrangement", JSONArray(s.arrangement).toString())
             .putString("known", known.toString())

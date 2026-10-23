@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,6 +53,7 @@ private val Offline = Color(0xFFC62828)
  * The controller's own page. Tap the left third to go back, the right third to go forward,
  * the middle to show or hide the toolbar. Pedal keys are handled in MainActivity.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val st by rt.state.collectAsStateWithLifecycle()
@@ -61,6 +64,9 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val changes by rt.notesChanges.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(rt::openPdf)
+    }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let(rt::openFolder)
     }
 
     Box(
@@ -113,8 +119,9 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                 Text(s.set?.name ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 1)
                 Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { picker.launch(arrayOf("application/pdf")) }) { Text("Open PDF") }
+                    Button(onClick = { folderPicker.launch(null) }) { Text("Open folder") }
                     Button(onClick = { showScreens = true }) { Text("Screens (${s.arrangement.size})") }
                     TextButton(onClick = onLeaveRole) { Text("Change role") }
                     TextButton(onClick = { showAbout = true }) { Text("?") }
