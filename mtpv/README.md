@@ -12,7 +12,8 @@ Architecture overview: [`../CONCEPT.md`](../CONCEPT.md).
     ./gradlew testDebugUnitTest
     adb install -r app/build/outputs/apk/debug/app-debug.apk
 
-Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10+ (minSdk 29); the controller role needs Android 14 (mDNS `registerServiceInfoCallback`).
+Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10+ (minSdk 29), for both roles. Discovery watches addresses with `registerServiceInfoCallback`
+on Android 14+; older controllers resolve once and resolve again when a secondary stops answering.
 
 ## Use
 

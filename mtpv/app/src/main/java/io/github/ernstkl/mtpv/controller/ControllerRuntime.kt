@@ -7,7 +7,6 @@ import io.github.ernstkl.mtpv.ControllerSession
 import io.github.ernstkl.mtpv.FrontNotification
 import io.github.ernstkl.mtpv.KnownSecondary
 import io.github.ernstkl.mtpv.MtpvApp
-import io.github.ernstkl.mtpv.controllerSupported
 import io.github.ernstkl.mtpv.core.FolderFile
 import io.github.ernstkl.mtpv.core.LibraryEntry
 import io.github.ernstkl.mtpv.core.LibraryLevel
@@ -35,6 +34,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -129,13 +129,12 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     fun start() {
-        // MtpvApp never creates a controller below Android 14; the check is for lint.
-        if (controllerSupported) discovery = Discovery(app, ::onFound).also { it.start() }
+        discovery = Discovery(app, ::onFound).also { it.start() }
         syncLinks()
     }
 
     fun stop() {
-        if (controllerSupported) discovery?.stop()
+        discovery?.stop()
         discovery = null
         scope.cancel()
         links.clear()
@@ -521,7 +520,11 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             val link = links.getOrPut(uuid) {
                 val l = SecondaryLink(
                     uuid, prefs.deviceUuid, cache, versions, this,
-                    report = { status -> _state.update { it.copy(links = it.links + (uuid to status)) } },
+                    report = { status ->
+                        val was = _state.getAndUpdate { it.copy(links = it.links + (uuid to status)) }.links[uuid]
+                        // Lost contact: its address may have changed; older Android does not tell by itself.
+                        if (was?.online == true && !status.online) scope.launch(Dispatchers.Main) { discovery?.refresh() }
+                    },
                     onInput = { event -> scope.launch(Dispatchers.Main) { onInput(uuid, event) } },
                 )
                 l to l.launchIn(scope)

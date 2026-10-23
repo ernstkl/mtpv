@@ -22,7 +22,7 @@ build, usage and protocol summary: `mtpv/README.md`.
   files and notes are keyed by SHA-256, the controller owns the authoritative notes and fetches a
   secondary's edits before giving it another page.
 - Pure logic belongs in `core/` with unit tests (`app/src/test/`); Android-only code stays thin around it.
-- minSdk is 29 (secondaries), the controller role needs API 34. Guard newer APIs.
+- minSdk is 29 for both roles. Guard newer APIs.
 - When behaviour visible to users changes, update `mtpv/README.md` and the About dialog
   (`ui/AboutDialog.kt`) as well.
 - Commit messages: `MTPV: <what changed>` in one line, for changes to the app.

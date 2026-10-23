@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -46,7 +45,6 @@ import io.github.ernstkl.mtpv.KeepAliveService
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.Prefs
 import io.github.ernstkl.mtpv.Role
-import io.github.ernstkl.mtpv.controllerSupported
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -144,10 +142,6 @@ class MainActivity : ComponentActivity() {
     private fun handleOpenIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
-        if (!controllerSupported) {
-            Toast.makeText(this, "Opening PDFs needs Android 14; this tablet can only be a secondary.", Toast.LENGTH_LONG).show()
-            return
-        }
         if (app.role.value != Role.CONTROLLER) app.setRole(Role.CONTROLLER)
         app.controller?.openPdf(uri)
     }
@@ -191,12 +185,8 @@ private fun RoleChooser(prefs: Prefs, current: Role, onCancel: () -> Unit, onCho
         Spacer(Modifier.height(8.dp))
         Text("What should this tablet do? The app remembers the choice.")
         Spacer(Modifier.height(32.dp))
-        Button(onClick = { onChoose(Role.CONTROLLER) }, Modifier.width(320.dp), enabled = controllerSupported) {
+        Button(onClick = { onChoose(Role.CONTROLLER) }, Modifier.width(320.dp)) {
             Text("Controller: open PDFs and turn pages")
-        }
-        if (!controllerSupported) {
-            Spacer(Modifier.height(4.dp))
-            Text("The controller needs Android 14 or newer.", style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = { onChoose(Role.SECONDARY) }, Modifier.width(320.dp)) {

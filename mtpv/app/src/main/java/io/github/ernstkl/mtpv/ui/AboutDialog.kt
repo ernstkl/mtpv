@@ -44,7 +44,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     "Tool and 👆 change on all screens at once.")
                 Text("When MTPV comes back to the front on one screen, the screens showing another app " +
                     "get a notification; tap it to bring MTPV back there too.")
-                Text("The controller needs Android 14, secondaries Android 10.")
+                Text("Needs Android 10 or newer.")
                 Spacer(Modifier.height(12.dp))
                 Text(
                     listOfNotNull(version?.let { "Version $it" }, "GPL-3.0-or-later", "github.com/ernstkl/mtpv")
