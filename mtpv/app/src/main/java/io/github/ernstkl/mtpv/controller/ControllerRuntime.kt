@@ -104,7 +104,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun prev() = turn(-1)
 
     private fun turn(delta: Int) = updateSession {
-        it.copy(start = Paging.clampStart(it.start + delta, it.pageCount, it.arrangement.size))
+        it.copy(start = Paging.clampStart(it.start + delta, it.pageCount))
     }
 
     // --- file ---
@@ -294,7 +294,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private fun updateSession(f: (ControllerSession) -> ControllerSession) {
         val before = _state.value.session
         var after = f(before)
-        after = after.copy(start = Paging.clampStart(after.start, after.pageCount, after.arrangement.size))
+        after = after.copy(start = Paging.clampStart(after.start, after.pageCount))
         if (after == before) return
         _state.update { it.copy(session = after) }
         prefs.saveSession(after)

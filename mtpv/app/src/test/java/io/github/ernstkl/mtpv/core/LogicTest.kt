@@ -17,14 +17,16 @@ class PagingTest {
     }
 
     @Test
-    fun startStopsWhenLastPageIsOnLastScreen() {
-        assertEquals(10, Paging.clampStart(11, 12, 3))
-        assertEquals(1, Paging.clampStart(0, 12, 3))
+    fun startStopsWhenLastPageIsOnFirstScreen() {
+        assertEquals(11, Paging.clampStart(11, 12))
+        assertEquals(12, Paging.clampStart(13, 12))
+        assertEquals(1, Paging.clampStart(0, 12))
+        assertEquals(listOf(12, 0, 0), (0..2).map { Paging.pageFor(12, it, 12) })
     }
 
     @Test
     fun fewerPagesThanScreens() {
-        assertEquals(1, Paging.clampStart(2, 2, 3))
+        assertEquals(2, Paging.clampStart(3, 2))
         assertEquals(listOf(1, 2, 0), (0..2).map { Paging.pageFor(1, it, 2) })
     }
 }

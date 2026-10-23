@@ -81,7 +81,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
             // While a secondary still holds this page's latest notes, wait for them before drawing.
             NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes, fingers = st.tools.fingers)
         }
-        if (s.fileId != null) NoteToolPicker(st.tools.tool, rt::setTool, st.tools.fingers, rt::setFingers, Modifier.align(Alignment.BottomStart).padding(8.dp))
+        if (s.fileId != null && st.ownPage > 0) NoteToolPicker(st.tools.tool, rt::setTool, st.tools.fingers, rt::setFingers, Modifier.align(Alignment.BottomStart).padding(8.dp))
 
         if (s.fileId == null) {
             Text(

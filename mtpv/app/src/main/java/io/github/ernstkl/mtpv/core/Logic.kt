@@ -11,10 +11,8 @@ object Paging {
         return if (page in 1..pageCount) page else 0
     }
 
-    /** Largest start that still fills as many screens as possible: the last page lands on the last slot. */
-    fun maxStart(pageCount: Int, slots: Int): Int = maxOf(1, pageCount - slots + 1)
-
-    fun clampStart(start: Int, pageCount: Int, slots: Int): Int = start.coerceIn(1, maxStart(pageCount, slots))
+    /** Pages turn on until the last page is on the first slot; the screens after it are blank. */
+    fun clampStart(start: Int, pageCount: Int): Int = start.coerceIn(1, maxOf(1, pageCount))
 }
 
 /**

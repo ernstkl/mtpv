@@ -27,6 +27,7 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 11
    Then **Open PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
+   Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
 5. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
    page and arrangement and reconnects; secondaries keep the last page until it does.
 

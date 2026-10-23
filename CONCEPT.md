@@ -11,8 +11,8 @@ One app with two roles, chosen once per device and restored at every start:
 - A **secondary** is a passive screen, like an extra monitor. It shows whatever page the controller
   tells it to and reports page turns and notes back.
 
-Slot *i* shows page *start + i*; slots past the last page stay blank. A page turn on any screen
-moves *start* by one, so every screen moves by one page.
+Slot *i* shows page *start + i*; slots past the last page show an empty-set sign (∅), and *start* goes
+up to the last page. A page turn on any screen moves *start* by one, so every screen moves by one page.
 
 ```
  ┌────────────┐   HTTP (paired, bearer token)   ┌─────────────┐

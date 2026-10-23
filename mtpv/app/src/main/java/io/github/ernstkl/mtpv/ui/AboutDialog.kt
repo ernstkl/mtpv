@@ -31,7 +31,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Text("3. On one tablet, choose Controller and open a PDF. Then Screens → Pair; " +
                     "check that the secondary shows the same code and tap Allow there.")
                 Text("4. Tap the right or left third of any screen, or use a Bluetooth pedal: " +
-                    "every screen moves on by one page.")
+                    "every screen moves on by one page, until the last page is on the leftmost screen.")
                 Spacer(Modifier.height(12.dp))
                 Text("Controller: tap the middle to show the toolbar. Secondary: long-press for its address and settings. " +
                     "If a secondary isn't found, enter its address under Screens.")
