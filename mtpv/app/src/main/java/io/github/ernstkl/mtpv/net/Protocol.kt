@@ -18,9 +18,13 @@ package io.github.ernstkl.mtpv.net
  *   GET  /v1/notes         {fileId, page, baseRev, rev, dirty, strokes}: notes of the shown page
  *   POST /v1/tool          {tool, fingers} -> {tool, fingers}: note tool (a NoteTool name) and finger
  *                          switch; 400 bad_tool
- *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off", ...]};
+ *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off" | "front", ...]};
  *                          long poll, answers
  *                          as soon as the secondary has input after N, or after INPUT_WAIT_MS with none
+ *   POST /v1/front         {} -> {shown}: MTPV came (back) to the front on another screen of the setup.
+ *                          If MTPV is not on screen here, the secondary posts a "tap to show"
+ *                          notification (Android lets no app jump to the front from the background);
+ *                          shown tells whether it was on screen already.
  *
  * Pages are 1-based; page 0 (or past the end) shows a blank screen.
  *
@@ -30,9 +34,14 @@ package io.github.ernstkl.mtpv.net
  *
  * Tool: the controller holds the note tool and finger switch last picked on any screen and sends
  * both with POST /v1/tool (resent when GET /v1/state reports others). A pick on a secondary becomes a
- * "tool:<name>" or "fingers:on|off" input event, but only after a controller has sent its tool state,
- * so older controllers never see these events. Older secondaries answer POST /v1/tool with 404 and
- * keep their own.
+ * "tool:<name>" or "fingers:on|off" input event.
+ *
+ * Front: when MTPV comes (back) to the front on the controller, it sends POST /v1/front to every
+ * secondary; on a secondary, that secondary reports a "front" input event and the controller passes
+ * it on to itself and the other secondaries. Coming to the front by tapping the "tap to show"
+ * notification is no trigger, so the screens do not wake each other in turn.
+ *
+ * During development all devices run the same app version; there are no fallbacks for older ones.
  */
 object Protocol {
     const val SERVICE_TYPE = "_mtpv._tcp"

@@ -44,7 +44,7 @@ interface NotesHub {
  * missing, sends the page, and keeps checking it every few seconds. Only the latest target matters,
  * so missed page turns are never replayed. Before a secondary gets a new page, the notes on its
  * current page are fetched and saved, so they are never lost. Once the page is right, note tool and
- * finger switch follow. A second loop forwards page turns and tool picks entered on the secondary to [onInput].
+ * finger switch follow, and requests to come to the front. A second loop forwards page turns and tool picks entered on the secondary to [onInput].
  */
 class SecondaryLink(
     private val uuid: String,
@@ -57,6 +57,8 @@ class SecondaryLink(
 ) {
     @Volatile private var target: Target? = null
     @Volatile private var tools: ToolState? = null
+    /** Time of a pending request to come to the front, or 0. */
+    @Volatile private var frontAt = 0L
     @Volatile private var endpoint: Endpoint? = null
     @Volatile private var token: String? = null
 
@@ -73,6 +75,12 @@ class SecondaryLink(
     fun setTools(t: ToolState) {
         if (t == tools) return
         tools = t
+        wake.trySend(Unit)
+    }
+
+    /** Asks the secondary to come to the front, once it shows its page; dropped if that takes too long. */
+    fun bringToFront() {
+        frontAt = System.currentTimeMillis()
         wake.trySend(Unit)
     }
 
@@ -105,7 +113,6 @@ class SecondaryLink(
 
         var applied: Target? = null
         var appliedTools: ToolState? = null
-        var toolSync = true
         var files = emptySet<String>()
         var backoff = 1_000L
 
@@ -125,7 +132,6 @@ class SecondaryLink(
                     files = client.files()
                     applied = null
                     appliedTools = null
-                    toolSync = true
                     verified = ep
                     publish(LinkStatus(online = true))
                 }
@@ -163,9 +169,15 @@ class SecondaryLink(
                     continue
                 }
                 val t = tools
-                if (t != null && toolSync && t != appliedTools) {
-                    toolSync = client.tools(t)
+                if (t != null && t != appliedTools) {
+                    client.tools(t)
                     appliedTools = t
+                    continue
+                }
+                val at = frontAt
+                if (at != 0L) {
+                    frontAt = 0L
+                    if (System.currentTimeMillis() - at < FRONT_MAX_AGE_MS) client.front()
                     continue
                 }
                 backoff = 1_000L
@@ -174,7 +186,7 @@ class SecondaryLink(
                     // Ping, and resend if the secondary shows something else (restarted, other controller).
                     val st = client.state()
                     if (applied != null && (st.fileId != applied.fileId || st.page != applied.page)) applied = null
-                    if (toolSync && st.tools != appliedTools) appliedTools = null
+                    if (st.tools != appliedTools) appliedTools = null
                 }
             } catch (e: NotPairedException) {
                 // Only a new pairing (setToken) helps; wait for it.
@@ -215,6 +227,7 @@ class SecondaryLink(
 
     companion object {
         private const val PING_MS = 3_000L
+        private const val FRONT_MAX_AGE_MS = 10_000L
     }
 }
 

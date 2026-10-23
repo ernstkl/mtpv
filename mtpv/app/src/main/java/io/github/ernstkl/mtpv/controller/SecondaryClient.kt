@@ -20,7 +20,7 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
 
     data class Info(val uuid: String, val name: String)
     data class PairStatus(val status: String, val token: String?)
-    /** [tools] is null from secondaries without tool sync. */
+    /** [tools] is null if the secondary sent none it could read. */
     data class State(val fileId: String?, val page: Int, val version: Long, val tools: ToolState?)
     data class Notes(val fileId: String?, val page: Int, val baseRev: Long, val rev: Long, val dirty: Boolean, val strokes: List<Stroke>)
 
@@ -63,15 +63,14 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
         )
     }
 
-    /** Sets note tool and finger switch on the secondary; false if it is too old for tool sync. */
-    fun tools(tools: ToolState): Boolean {
-        val body = ToolSync.toJson(tools).toString().toByteArray()
-        val (code, json) = request("POST", "/v1/tool", body, acceptErrors = true)
-        return when (code) {
-            200 -> true
-            404 -> false
-            else -> throw IOException("tool failed: HTTP $code ${json.optString("message")}")
-        }
+    /** Sets note tool and finger switch on the secondary. */
+    fun tools(tools: ToolState) {
+        request("POST", "/v1/tool", ToolSync.toJson(tools).toString().toByteArray())
+    }
+
+    /** Asks the secondary to come to the front. */
+    fun front() {
+        request("POST", "/v1/front", ByteArray(0))
     }
 
     /** Waits for page turns and tool picks entered on the secondary; returns the new sequence number and the events. */

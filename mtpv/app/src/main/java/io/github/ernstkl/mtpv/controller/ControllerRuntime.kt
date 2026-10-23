@@ -3,6 +3,7 @@ package io.github.ernstkl.mtpv.controller
 import android.net.Uri
 import android.provider.OpenableColumns
 import io.github.ernstkl.mtpv.ControllerSession
+import io.github.ernstkl.mtpv.FrontNotification
 import io.github.ernstkl.mtpv.KnownSecondary
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.controllerSupported
@@ -284,6 +285,14 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         links.values.forEach { it.first.setTools(t) }
     }
 
+    // --- bring MTPV to the front on every screen ---
+
+    /** MTPV came (back) to the front here or on secondary [from]: the other screens follow (main thread). */
+    fun cameToFront(from: String? = null) {
+        if (from != null && !app.inFront) FrontNotification.show(app)
+        links.forEach { (uuid, l) -> if (uuid != from) l.first.bringToFront() }
+    }
+
     fun clearMessage() = _state.update { it.copy(message = null) }
 
     private fun showMessage(m: String) = _state.update { it.copy(message = m) }
@@ -315,7 +324,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 val l = SecondaryLink(
                     uuid, prefs.deviceUuid, cache, versions, this,
                     report = { status -> _state.update { it.copy(links = it.links + (uuid to status)) } },
-                    onInput = { event -> scope.launch(Dispatchers.Main) { onInput(event) } },
+                    onInput = { event -> scope.launch(Dispatchers.Main) { onInput(uuid, event) } },
                 )
                 l to l.launchIn(scope)
             }.first
@@ -328,15 +337,17 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         }
     }
 
-    private fun onInput(event: String) {
+    private fun onInput(uuid: String, event: String) {
         when (event) {
             "prev" -> prev()
             "next" -> next()
+            FRONT_EVENT -> cameToFront(from = uuid)
             else -> ToolSync.apply(_state.value.tools, event)?.let(::setTools)
         }
     }
 
     companion object {
         private const val PAIR_TIMEOUT_MS = 60_000L
+        const val FRONT_EVENT = "front"
     }
 }

@@ -22,6 +22,9 @@ class MtpvApp : Application() {
     var secondary: SecondaryRuntime? = null
         private set
 
+    /** MTPV is on screen (MainActivity started). */
+    @Volatile var inFront = false
+
     private val _role = MutableStateFlow(Role.NONE)
     val role: StateFlow<Role> = _role
 

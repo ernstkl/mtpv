@@ -40,6 +40,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import io.github.ernstkl.mtpv.FrontNotification
 import io.github.ernstkl.mtpv.KeepAliveService
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.Prefs
@@ -83,6 +84,34 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** Set in onStart, handled in onResume: by then onNewIntent has delivered the intent that brought us here. */
+    private var cameToFront = false
+
+    override fun onStart() {
+        super.onStart()
+        app.inFront = true
+        FrontNotification.cancel(this)
+        cameToFront = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!cameToFront) return
+        cameToFront = false
+        // Brought here by the "tap to show" notification: the others were woken already.
+        if (intent.getBooleanExtra(FrontNotification.EXTRA_FROM_NOTIFICATION, false)) {
+            intent.removeExtra(FrontNotification.EXTRA_FROM_NOTIFICATION)
+            return
+        }
+        app.controller?.cameToFront()
+        app.secondary?.cameToFront()
+    }
+
+    override fun onStop() {
+        app.inFront = false
+        super.onStop()
     }
 
     /** Without this permission the service still runs, but its notification is hidden. */

@@ -28,7 +28,10 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 11
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
-5. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
+5. When MTPV comes (back) to the front on any screen, the other screens follow: where another app
+   is in front, a notification "MTPV: tap to show" appears. (Android does not let an app jump to
+   the front by itself.)
+6. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
    page and arrangement and reconnects; secondaries keep the last page until it does.
 
 Notes: write with the stylus on any screen; fingers keep turning pages. The dot in the bottom-left
@@ -59,6 +62,10 @@ On a secondary, long-press for its address and to change the role.
 - The controller runs one `SecondaryLink` per secondary that converges it to its target page,
   uploads the PDF if needed and pings every 3 s. It also keeps a long-poll request (`GET /v1/input`)
   open on each secondary, which answers as soon as someone turns a page or picks a tool there.
+- Bringing MTPV to the front: when MTPV comes to the front on the controller, it sends
+  `POST /v1/front` to each secondary; on a secondary, it reports a `front` event over the long poll
+  and the controller passes it on. A screen not showing MTPV posts a heads-up notification; tapping
+  it brings MTPV to the front without waking the others again.
 - Note tool and finger switch work the same way: the controller holds the last ones picked on any
   screen and sends them to every secondary (`POST /v1/tool`).
 

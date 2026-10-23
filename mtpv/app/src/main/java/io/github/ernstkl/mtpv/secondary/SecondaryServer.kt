@@ -53,6 +53,7 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
                 rt.toolsFromController(tools)
                 ok(ToolSync.toJson(tools))
             }
+            s.method == Method.POST && path == "/v1/front" -> ok(JSONObject().put("shown", rt.frontRequested()))
             s.method == Method.PUT && path.startsWith("/v1/files/") -> putFile(s, path.removePrefix("/v1/files/"))
             s.method == Method.POST && path == "/v1/display" -> {
                 val body = JSONObject(String(readBody(s), Charsets.UTF_8))

@@ -6,7 +6,9 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import io.github.ernstkl.mtpv.DisplayState
+import io.github.ernstkl.mtpv.FrontNotification
 import io.github.ernstkl.mtpv.MtpvApp
+import io.github.ernstkl.mtpv.controller.ControllerRuntime
 import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.NotesJson
 import io.github.ernstkl.mtpv.core.PageKey
@@ -55,9 +57,6 @@ class SecondaryRuntime(private val app: MtpvApp) {
     /** Note tool and finger switch; the controller resends its own after a restart of this app. */
     private val _tools = MutableStateFlow(ToolState())
     val tools: StateFlow<ToolState> = _tools
-
-    /** A controller has sent its tool state, so it understands tool events. */
-    @Volatile private var toolSync = false
 
     /** Time of the last request from a controller, for the "connected" indicator. */
     private val _lastContact = MutableStateFlow(0L)
@@ -229,16 +228,15 @@ class SecondaryRuntime(private val app: MtpvApp) {
     /** Picked on this screen: passed on to the controller, which picks it on the other screens. */
     fun pickTool(t: NoteTool) {
         _tools.value = _tools.value.copy(tool = t)
-        if (toolSync) sendInput(ToolSync.event(t))
+        sendInput(ToolSync.event(t))
     }
 
     fun setFingers(on: Boolean) {
         _tools.value = _tools.value.copy(fingers = on)
-        if (toolSync) sendInput(ToolSync.event(on))
+        sendInput(ToolSync.event(on))
     }
 
     fun toolsFromController(t: ToolState) {
-        toolSync = true
         _tools.value = t
     }
 
@@ -248,7 +246,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
     private var inputSeq = 0L
     private val recentInput = ArrayDeque<Pair<Long, String>>()
 
-    /** Queues [action] ("next", "prev" or a tool event) for the controller. */
+    /** Queues [action] ("next", "prev", "front" or a tool event) for the controller. */
     fun sendInput(action: String) = synchronized(inputLock) {
         inputSeq++
         recentInput.addLast(inputSeq to action)
@@ -270,6 +268,16 @@ class SecondaryRuntime(private val app: MtpvApp) {
         }
         val events = if (after < 0 || after > inputSeq) emptyList() else recentInput.filter { it.first > after }
         JSONObject().put("seq", inputSeq).put("events", JSONArray(events.map { it.second }))
+    }
+
+    /** MTPV came (back) to the front here: the controller brings it to the front on the other screens. */
+    fun cameToFront() = sendInput(ControllerRuntime.FRONT_EVENT)
+
+    /** The controller asks to bring MTPV to the front; returns whether it is on screen already. */
+    fun frontRequested(): Boolean {
+        val shown = app.inFront
+        if (!shown) FrontNotification.show(app)
+        return shown
     }
 
     fun afterStore(id: String) {

@@ -38,6 +38,8 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Text("Notes: draw with a stylus; pick pen, marker or eraser with the dot at the bottom left. " +
                     "Without a stylus, tap 👆 next to it (green = on) to draw with a finger; taps on the page then no longer turn it. " +
                     "Both settings change on all screens at once.")
+                Text("When MTPV comes back to the front on one screen, the screens showing another app " +
+                    "get a notification; tap it to bring MTPV back there too.")
                 Text("The controller needs Android 14, secondaries Android 11.")
                 Spacer(Modifier.height(12.dp))
                 Text(
