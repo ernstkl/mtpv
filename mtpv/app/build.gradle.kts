@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.ernstkl.mtpv"
-        minSdk = 34
+        minSdk = 30
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"

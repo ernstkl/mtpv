@@ -15,7 +15,7 @@
 
 <p><b>Requirements</b></p>
 <ul>
-<li>Android 14 or newer on every tablet</li>
+<li>Android 14 or newer on the controller tablet, Android 11 or newer on the others</li>
 <li>All tablets in the same Wi-Fi network (no internet connection needed, nothing leaves your network)</li>
 </ul>
 

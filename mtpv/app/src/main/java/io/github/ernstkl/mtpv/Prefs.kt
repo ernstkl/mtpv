@@ -3,12 +3,17 @@ package io.github.ernstkl.mtpv
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
+import androidx.annotation.ChecksSdkIntAtLeast
 import io.github.ernstkl.mtpv.core.Paging
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
 enum class Role { NONE, CONTROLLER, SECONDARY }
+
+/** Discovery needs NsdManager.registerServiceInfoCallback (Android 14); older tablets can only be secondaries. */
+@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+val controllerSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
 /**
  * A secondary as the controller remembers it. Host and port may be outdated; the UUID is the identity.

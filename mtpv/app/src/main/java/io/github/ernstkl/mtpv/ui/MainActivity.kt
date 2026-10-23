@@ -3,9 +3,11 @@ package io.github.ernstkl.mtpv.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +39,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import io.github.ernstkl.mtpv.KeepAliveService
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.Role
+import io.github.ernstkl.mtpv.controllerSupported
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -81,7 +84,8 @@ class MainActivity : ComponentActivity() {
     private fun askForNotifications() {
         if (askedForNotifications) return
         askedForNotifications = true
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -96,6 +100,10 @@ class MainActivity : ComponentActivity() {
     private fun handleOpenIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
+        if (!controllerSupported) {
+            Toast.makeText(this, "Opening PDFs needs Android 14; this tablet can only be a secondary.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (app.role.value != Role.CONTROLLER) app.setRole(Role.CONTROLLER)
         app.controller?.openPdf(uri)
     }
@@ -135,8 +143,12 @@ private fun RoleChooser(onChoose: (Role) -> Unit) {
         Spacer(Modifier.height(8.dp))
         Text("What should this tablet do? The app remembers the choice.")
         Spacer(Modifier.height(32.dp))
-        Button(onClick = { onChoose(Role.CONTROLLER) }, Modifier.width(320.dp)) {
+        Button(onClick = { onChoose(Role.CONTROLLER) }, Modifier.width(320.dp), enabled = controllerSupported) {
             Text("Controller: open PDFs and turn pages")
+        }
+        if (!controllerSupported) {
+            Spacer(Modifier.height(4.dp))
+            Text("The controller needs Android 14 or newer.", style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = { onChoose(Role.SECONDARY) }, Modifier.width(320.dp)) {

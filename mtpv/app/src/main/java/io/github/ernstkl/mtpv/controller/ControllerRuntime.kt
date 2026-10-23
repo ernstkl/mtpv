@@ -5,6 +5,7 @@ import android.provider.OpenableColumns
 import io.github.ernstkl.mtpv.ControllerSession
 import io.github.ernstkl.mtpv.KnownSecondary
 import io.github.ernstkl.mtpv.MtpvApp
+import io.github.ernstkl.mtpv.controllerSupported
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Paging
@@ -79,12 +80,13 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     fun start() {
-        discovery = Discovery(app, ::onFound).also { it.start() }
+        // MtpvApp never creates a controller below Android 14; the check is for lint.
+        if (controllerSupported) discovery = Discovery(app, ::onFound).also { it.start() }
         syncLinks()
     }
 
     fun stop() {
-        discovery?.stop()
+        if (controllerSupported) discovery?.stop()
         discovery = null
         scope.cancel()
         links.clear()

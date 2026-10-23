@@ -33,14 +33,15 @@ class MtpvApp : Application() {
         setRole(prefs.role)
     }
 
-    fun setRole(role: Role) {
+    fun setRole(requested: Role) {
+        val role = if (requested == Role.CONTROLLER && !controllerSupported) Role.NONE else requested
         controller?.stop()
         controller = null
         secondary?.stop()
         secondary = null
         prefs.role = role
         when (role) {
-            Role.CONTROLLER -> controller = ControllerRuntime(this).also { it.start() }
+            Role.CONTROLLER -> if (controllerSupported) controller = ControllerRuntime(this).also { it.start() }
             Role.SECONDARY -> secondary = SecondaryRuntime(this).also { it.start() }
             Role.NONE -> Unit
         }

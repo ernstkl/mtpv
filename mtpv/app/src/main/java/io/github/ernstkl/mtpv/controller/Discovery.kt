@@ -3,12 +3,15 @@ package io.github.ernstkl.mtpv.controller
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import io.github.ernstkl.mtpv.net.Endpoint
 import io.github.ernstkl.mtpv.net.Protocol
 import java.net.Inet4Address
 
 /** Finds secondaries via mDNS/DNS-SD. [onFound] runs on the main thread, also when an address changes. */
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class Discovery(
     context: Context,
     private val onFound: (uuid: String, name: String, endpoint: Endpoint) -> Unit,
