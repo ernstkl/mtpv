@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -161,7 +162,7 @@ private fun DrawScope.drawNote(tool: Tool, color: Int, width: Float, points: Flo
 }
 
 /**
- * Tool bar: the square finger switch turns finger drawing on (green) and off (grey, crossed out);
+ * Tool bar: the square finger switch (a finger writing a line) turns finger drawing on (green) and off (grey, crossed out);
  * then pen colours (a small dot on white), marker and eraser, the selected one underlined, each picked with one tap; last
  * the undo button, which removes the page's last stroke, whoever drew it; dimmed on an empty page.
  */
@@ -187,20 +188,19 @@ fun NoteToolPicker(
             Modifier
                 .size(28.dp)
                 .alpha(if (fingers) 1f else 0.6f)
+                .clip(square)
                 .background(if (fingers) Color(0xFF2E7D32) else Color.DarkGray, square)
                 .border(1.dp, Color.White, square)
                 .drawWithContent {
                     drawContent()
+                    drawFingerWriting()
                     if (!fingers) {
                         drawLine(Color(0xFFE53935), Offset(size.width * 0.2f, size.height * 0.8f),
                             Offset(size.width * 0.8f, size.height * 0.2f), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
                     }
                 }
                 .clickable { onFingers(!fingers) },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("👆", color = Color.White, fontSize = 16.sp)
-        }
+        )
         Separator()
 
         NoteTool.entries.forEach { t ->
@@ -244,6 +244,25 @@ fun NoteToolPicker(
 
 @Composable
 private fun Separator() = Box(Modifier.size(width = 1.dp, height = 24.dp).background(Color.Gray))
+
+/** A finger from the top right, the hand cut off by the corner, writing a wavy line from its tip. */
+private fun DrawScope.drawFingerWriting() {
+    val w = size.width
+    val h = size.height
+    fun at(x: Float, y: Float) = Offset(x * w, y * h)
+    drawLine(Color.White, at(0.48f, 0.56f), at(0.80f, 0.12f), strokeWidth = 0.18f * w, cap = StrokeCap.Round)
+    drawCircle(Color.White, radius = 0.20f * w, center = at(0.92f, 0.10f))
+    // Knuckle crease and nail.
+    drawLine(Color(0xFF9E9E9E), at(0.62f, 0.38f), at(0.69f, 0.43f), strokeWidth = 0.025f * w, cap = StrokeCap.Round)
+    drawLine(Color(0xFF9E9E9E), at(0.495f, 0.59f), at(0.545f, 0.52f), strokeWidth = 0.08f * w, cap = StrokeCap.Round)
+    val line = Path().apply {
+        moveTo(0.42f * w, 0.66f * h)
+        cubicTo(0.36f * w, 0.78f * h, 0.30f * w, 0.58f * h, 0.24f * w, 0.70f * h)
+        cubicTo(0.19f * w, 0.80f * h, 0.30f * w, 0.84f * h, 0.22f * w, 0.88f * h)
+        cubicTo(0.16f * w, 0.91f * h, 0.12f * w, 0.82f * h, 0.08f * w, 0.90f * h)
+    }
+    drawPath(line, Color.White, style = StrokeStyle(width = 0.05f * w, cap = StrokeCap.Round, join = StrokeJoin.Round))
+}
 
 /** A tilted rubber: pink tip on the left, blue sleeve on the right. */
 private fun DrawScope.drawEraser() {

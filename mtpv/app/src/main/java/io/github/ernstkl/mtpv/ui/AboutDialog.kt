@@ -40,8 +40,8 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Text("Controller: tap the middle or ☰ for the menu. Secondary: tap the middle or ☰ for its address and settings. " +
                     "If a secondary isn't found, enter its address under Screens.")
                 Text("Notes: draw with a stylus; pick pen, marker or eraser in the bar at the bottom left, ↶ undoes. " +
-                    "Without a stylus, tap 👆 (green = on) to draw with a finger; taps on the page then no longer turn it. " +
-                    "Tool and 👆 change on all screens at once.")
+                    "Without a stylus, tap the square finger button (green = on) to draw with a finger; taps on the page then no longer turn it. " +
+                    "Tool and finger button change on all screens at once.")
                 Text("When MTPV comes back to the front on one screen, the screens showing another app " +
                     "get a notification; tap it to bring MTPV back there too.")
                 Text("Needs Android 10 or newer.")
