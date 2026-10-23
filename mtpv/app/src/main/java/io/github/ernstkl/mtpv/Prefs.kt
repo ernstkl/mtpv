@@ -5,6 +5,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.annotation.ChecksSdkIntAtLeast
 import io.github.ernstkl.mtpv.core.Paging
+import io.github.ernstkl.mtpv.core.Song
+import io.github.ernstkl.mtpv.core.SongSet
 import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.ToolSync
 import org.json.JSONArray
@@ -26,11 +28,9 @@ data class KnownSecondary(val uuid: String, val name: String, val host: String?,
 /** A controller this secondary accepts commands from (secondary side). */
 data class PairedController(val uuid: String, val name: String, val token: String)
 
-/** What the controller restores at the next start. */
+/** What the controller restores at the next start. [start] is a page in the stream of the set's pages. */
 data class ControllerSession(
-    val fileId: String?,
-    val fileName: String?,
-    val pageCount: Int,
+    val set: SongSet?,
     val start: Int,
     val arrangement: List<String>,
     val known: Map<String, KnownSecondary>,
@@ -81,9 +81,7 @@ class Prefs(private val context: Context) {
             }
         }.orEmpty().associateBy { it.uuid }
         return ControllerSession(
-            fileId = sp.getString("fileId", null),
-            fileName = sp.getString("fileName", null),
-            pageCount = sp.getInt("pageCount", 0),
+            set = sp.getString("set", null)?.let { runCatching { setFromJson(JSONObject(it)) }.getOrNull() },
             start = sp.getInt("start", 1),
             arrangement = arrangement,
             known = known,
@@ -99,13 +97,24 @@ class Prefs(private val context: Context) {
             )
         }
         sp.edit()
-            .putString("fileId", s.fileId)
-            .putString("fileName", s.fileName)
-            .putInt("pageCount", s.pageCount)
+            .putString("set", s.set?.let { setToJson(it).toString() })
             .putInt("start", s.start)
             .putString("arrangement", JSONArray(s.arrangement).toString())
             .putString("known", known.toString())
             .apply()
+    }
+
+    private fun setToJson(set: SongSet): JSONObject {
+        val songs = JSONArray()
+        set.songs.forEach { songs.put(JSONObject().put("name", it.name).put("fileId", it.fileId).put("pageCount", it.pageCount)) }
+        return JSONObject().put("name", set.name).put("songs", songs)
+    }
+
+    private fun setFromJson(o: JSONObject): SongSet {
+        val songs = o.getJSONArray("songs").let { a ->
+            List(a.length()) { a.getJSONObject(it) }.map { Song(it.getString("name"), it.getString("fileId"), it.getInt("pageCount")) }
+        }
+        return SongSet.of(o.getString("name"), songs)
     }
 
     fun loadPaired(): List<PairedController> = sp.getString("paired", null)?.let { s ->

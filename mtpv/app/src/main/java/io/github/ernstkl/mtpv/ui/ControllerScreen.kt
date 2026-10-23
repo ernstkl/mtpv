@@ -55,7 +55,7 @@ private val Offline = Color(0xFFC62828)
 fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val st by rt.state.collectAsStateWithLifecycle()
     val s = st.session
-    var showBar by remember { mutableStateOf(s.fileId == null) }
+    var showBar by remember { mutableStateOf(s.set == null) }
     var showScreens by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     val changes by rt.notesChanges.collectAsStateWithLifecycle()
@@ -75,14 +75,15 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                 }
             }),
     ) {
-        PageView(s.fileId, st.ownPage, rt::render) { fileId, page ->
+        val own = st.ownTarget
+        PageView(own?.fileId, own?.page ?: 0, rt::render) { fileId, page ->
             val key = PageKey(fileId, page)
             val strokes = remember(key, changes) { rt.load(key).strokes }
             // While a secondary still holds this page's latest notes, wait for them before drawing.
             NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes, fingers = st.tools.fingers)
         }
-        if (s.fileId != null && st.ownPage > 0) {
-            val key = PageKey(s.fileId, st.ownPage)
+        if (own?.fileId != null && own.page > 0) {
+            val key = PageKey(own.fileId, own.page)
             val strokes = remember(key, changes) { rt.load(key).strokes }
             NoteToolPicker(
                 st.tools.tool, rt::setTool, st.tools.fingers, rt::setFingers,
@@ -92,7 +93,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
             )
         }
 
-        if (s.fileId == null) {
+        if (s.set == null) {
             Text(
                 "No PDF open. Tap the middle of the screen for the toolbar.",
                 Modifier.align(Alignment.Center).padding(32.dp),
@@ -109,7 +110,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     .background(Color(0xCC000000))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                Text(s.fileName ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text(s.set?.name ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 1)
                 Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -159,9 +160,9 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
 
 private fun pageSummary(st: ControllerState): String {
     val s = st.session
-    if (s.fileId == null) return "No PDF open"
-    val last = minOf(s.start + s.arrangement.size - 1, s.pageCount)
-    return "Pages ${s.start}–$last of ${s.pageCount}"
+    if (s.set == null) return "No PDF open"
+    val last = minOf(s.start + s.arrangement.size - 1, st.totalPages)
+    return "Pages ${s.start}–$last of ${st.totalPages}"
 }
 
 /** One dot per secondary, in screen order: green shows the right page, yellow is busy, red is unreachable. */
@@ -201,7 +202,7 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
                         Column {
                             Text(if (id == Paging.SELF) "This device" else nameOf(st, id))
                             Text(
-                                (if (s.fileId == null) "" else if (page == 0) "blank · " else "page $page · ") +
+                                (if (s.set == null) "" else if (page == 0) "blank · " else "page $page · ") +
                                     if (id == Paging.SELF) "controller" else describe(st.links[id]),
                                 style = MaterialTheme.typography.bodySmall,
                             )

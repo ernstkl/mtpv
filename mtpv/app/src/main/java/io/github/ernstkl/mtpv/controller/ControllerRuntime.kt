@@ -12,6 +12,8 @@ import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Paging
+import io.github.ernstkl.mtpv.core.Song
+import io.github.ernstkl.mtpv.core.SongSet
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.moved
@@ -48,9 +50,20 @@ data class ControllerState(
     val message: String? = null,
 ) {
     val slots get() = session.arrangement.size
-    val ownPage get() = pageForSlot(session.arrangement.indexOf(Paging.SELF))
+    val totalPages get() = session.set?.totalPages ?: 0
+    val ownTarget get() = targetForSlot(session.arrangement.indexOf(Paging.SELF))
 
-    fun pageForSlot(slot: Int) = Paging.pageFor(session.start, slot, session.pageCount)
+    /** Page of the set's stream shown in [slot], or 0 if that screen is blank. */
+    fun pageForSlot(slot: Int) = Paging.pageFor(session.start, slot, totalPages)
+
+    /**
+     * File and page within it for [slot]. A blank screen past the end gets the last song's file
+     * with page 0, so it shows the empty-set sign. Null while no set is open.
+     */
+    fun targetForSlot(slot: Int): Target? {
+        val set = session.set ?: return null
+        return set.locate(pageForSlot(slot))?.let { Target(it.fileId, it.page) } ?: Target(set.songs.last().fileId, 0)
+    }
 
     /** Secondary that still holds unsaved notes of [key] and can be reached, if any. */
     fun holderOf(key: PageKey, except: String? = null): String? =
@@ -77,13 +90,8 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private fun restoreSession(): ControllerSession {
         val s = prefs.loadSession()
         val withSelf = if (Paging.SELF in s.arrangement) s.arrangement else listOf(Paging.SELF) + s.arrangement
-        val fileOk = s.fileId != null && cache.has(s.fileId)
-        return s.copy(
-            fileId = s.fileId.takeIf { fileOk },
-            fileName = s.fileName.takeIf { fileOk },
-            pageCount = if (fileOk) s.pageCount else 0,
-            arrangement = withSelf,
-        )
+        val setOk = s.set != null && s.set.songs.isNotEmpty() && s.set.songs.all { cache.has(it.fileId) }
+        return s.copy(set = s.set.takeIf { setOk }, arrangement = withSelf)
     }
 
     fun start() {
@@ -106,11 +114,12 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun prev() = turn(-1)
 
     private fun turn(delta: Int) = updateSession {
-        it.copy(start = Paging.clampStart(it.start + delta, it.pageCount))
+        it.copy(start = it.start + delta)
     }
 
     // --- file ---
 
+    /** A single PDF becomes a set of one song. */
     fun openPdf(uri: Uri) {
         scope.launch {
             _state.update { it.copy(busy = "Loading PDF…") }
@@ -119,8 +128,10 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                     ?: error("cannot read file")
                 val name = displayName(uri)
                 val count = app.renderers.get(id)?.pageCount ?: error("not a readable PDF")
+                val set = SongSet.of(name, listOf(Song(name, id, count)))
+                if (set.songs.isEmpty()) error("the PDF has no pages")
                 withContext(Dispatchers.Main) {
-                    updateSession { it.copy(fileId = id, fileName = name, pageCount = count, start = 1) }
+                    updateSession { it.copy(set = set, start = 1) }
                 }
                 cache.evict(setOf(id))
             } catch (e: Exception) {
@@ -298,7 +309,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private fun updateSession(f: (ControllerSession) -> ControllerSession) {
         val before = _state.value.session
         var after = f(before)
-        after = after.copy(start = Paging.clampStart(after.start, after.pageCount))
+        after = after.copy(start = Paging.clampStart(after.start, after.set?.totalPages ?: 0))
         if (after == before) return
         _state.update { it.copy(session = after) }
         prefs.saveSession(after)
@@ -327,7 +338,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 k.host?.let { link.setEndpoint(Endpoint(it, k.port)) }
                 link.setToken(k.token)
             }
-            link.setTarget(s.fileId?.let { Target(it, st.pageForSlot(slot)) })
+            link.setTarget(st.targetForSlot(slot))
             link.setTools(st.tools)
         }
     }
