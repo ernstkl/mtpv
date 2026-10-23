@@ -6,6 +6,6 @@ show the following page. Made for sheet music on a music stand. Stylus notes, Bl
 pairing included; controller on Android 14+, secondaries on Android 11+, local Wi-Fi only.
 
 - App, build and usage: [`mtpv/README.md`](mtpv/README.md)
-- Why a standalone app instead of extending OpenSong: [`ANALYSIS.md`](ANALYSIS.md)
+- Architecture overview and why it is not built on OpenSong: [`CONCEPT.md`](CONCEPT.md)
 
 License: [GPL-3.0-or-later](LICENSE)

@@ -4,7 +4,7 @@ One app, two roles. A **controller** tablet opens a PDF and turns pages. Each **
 shows one page: the screen to the right of the controller shows the next page, and so on.
 A page turn moves every screen by one page.
 
-Requirements and the decision against an OpenSong fork: `../ANALYSIS.md`.
+Architecture overview: [`../CONCEPT.md`](../CONCEPT.md).
 
 ## Build
 
@@ -32,7 +32,9 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 11
 
 Notes: write with the stylus on any screen; fingers keep turning pages. The dot in the bottom-left
 corner picks black/red/blue pen, yellow marker or eraser (whole strokes; the stylus eraser end works
-too). Notes belong to the PDF's content: a changed PDF starts without notes.
+too). Without a stylus, tap the square finger switch left of the dot (green = on): a finger then
+draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
+The switch is per screen. Notes belong to the PDF's content: a changed PDF starts without notes.
 
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
 On a secondary, long-press for its address and to change the role.
