@@ -9,7 +9,8 @@ One app with two roles, chosen once per device and restored at every start:
 - The **controller** owns the session: the song set, the first page shown, and the arrangement of
   screens (an ordered list of slots, one of which is the controller itself). A song set is an
   ordered list of PDFs whose pages follow each other like one long PDF; a single PDF is a set of
-  one song, a folder of PDFs a set in the order stored for that folder.
+  one song, a folder of PDFs a set in the order stored for that folder. The folders of PDFs below
+  one library folder are the controller's set library, browsed one level at a time from the menu drawer.
 - A **secondary** is a passive screen, like an extra monitor. It shows whatever page the controller
   tells it to and reports page turns and notes back.
 
@@ -48,6 +49,10 @@ up to the last page. A page turn on any screen moves *start* by one, so every sc
 - **Sets live on the controller only.** A secondary gets single (file, page) targets and never
   learns about sets, so song sets needed no protocol change. Each PDF is copied into the
   controller's cache, so a file changing in the folder cannot change content under a known hash.
+  A folder's stored order is keyed by its document ID, so it is the same folder whether it was
+  picked directly or reached through the library.
+- **Nothing on the page but the page.** The controller's menu is a drawer, opened by a tap in the
+  middle or a small ☰ button; there is no edge swipe, so it never clashes with the pen or page turns.
 - **Content-addressed files.** PDFs are identified by their SHA-256, uploaded once and cached on both
   sides. Notes are keyed by the same hash, so a changed PDF starts with no notes.
 - **Single owner for notes.** The controller holds the authoritative copy of all notes. A secondary

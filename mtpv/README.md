@@ -19,7 +19,8 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10
 1. Install on all tablets, all on the same Wi-Fi.
 2. First start: choose **Controller** on one tablet and **Secondary** on the others. The choice is
    remembered, so later starts go straight into the role.
-3. Pair each secondary once: on the controller, tap the middle of the screen → **Screens** → under
+3. Pair each secondary once: on the controller, tap the middle of the screen (or ☰ top left) to open
+   the menu → **Screens** → under
    *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary (both show the same code).
    Paired secondaries are added to the right of the controller; **Screens** sets the order (the
    controller can be in any position) and lets you add a secondary by IP if mDNS is blocked.
@@ -31,7 +32,12 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10
    Files without pages are left out. Subfolders are not included. **Songs** lists the set: tap a song
    to show it from the leftmost screen, drag ≡ to change the order, untick a song to leave its pages
    out (it stays in the list, so it can be ticked again). Order and ticks are kept for that folder.
-   **Reload folder** picks up added or removed PDFs. The toolbar shows the song on the leftmost screen.
+   **Reload folder** picks up added or removed PDFs. The top of the menu shows the song on the leftmost screen.
+   To keep many sets, put their folders below one **Library folder** (in the menu; folders in
+   folders are fine, such as Gigs / 2026 / May). **Sets…** browses it: a folder without subfolders
+   opens as a set at a tap, one with subfolders opens to show them (↑ goes back up), and *Show this
+   folder as a set* opens the PDFs of the folder shown. The open set is marked. Folders starting with
+   "." and folders without PDFs are not shown. A set keeps its order and ticks however it was opened.
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
@@ -62,7 +68,8 @@ On a secondary, long-press for its address and to change the role.
   (`Authorization: Bearer …`). Paired controllers can be removed on the secondary (long press).
 - PDFs are identified by SHA-256 and sent once; both roles keep them in `filesDir/pdfs`
   (100 files / 2 GB, least recently used are removed first; the controller never removes the open set's files).
-- A folder is read through the Storage Access Framework (read access only, kept across restarts). Its
+- A folder is read through the Storage Access Framework (read access only, kept across restarts; one
+  grant for the library folder covers every folder below it). Its
   PDFs are copied into the cache; `filesDir/sets/<hash of the folder's document ID>.json` keeps the
   song order and each file's size and date, so unchanged files are not read again. Secondaries only
   ever see single files: the controller works out each screen's file and page.

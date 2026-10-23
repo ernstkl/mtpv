@@ -35,7 +35,9 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Text("Song sets: put one PDF per song in a folder and tap Open folder. The songs follow each other " +
                     "in alphabetical order, like one long PDF. Under Songs, tap a song to jump to it, drag ≡ to change the order, untick a song to leave it out.")
-                Text("Controller: tap the middle to show the toolbar. Secondary: long-press for its address and settings. " +
+                Text("Many sets: put their folders below one Library folder, then pick a set under Sets…. " +
+                    "A folder with subfolders opens to show them; ↑ goes back up.")
+                Text("Controller: tap the middle or ☰ for the menu. Secondary: long-press for its address and settings. " +
                     "If a secondary isn't found, enter its address under Screens.")
                 Text("Notes: draw with a stylus; pick pen, marker or eraser in the bar at the bottom left, ↶ undoes. " +
                     "Without a stylus, tap 👆 (green = on) to draw with a finger; taps on the page then no longer turn it. " +
