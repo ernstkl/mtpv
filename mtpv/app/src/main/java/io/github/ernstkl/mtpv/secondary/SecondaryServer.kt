@@ -3,6 +3,7 @@ package io.github.ernstkl.mtpv.secondary
 import io.github.ernstkl.mtpv.core.HashMismatchException
 import io.github.ernstkl.mtpv.core.NotesJson
 import io.github.ernstkl.mtpv.core.PdfCache
+import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.net.Protocol
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
@@ -44,6 +45,13 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
             s.method == Method.GET && path == "/v1/input" -> {
                 val after = s.parameters["after"]?.firstOrNull()?.toLongOrNull() ?: -1
                 ok(rt.awaitInput(after, Protocol.INPUT_WAIT_MS))
+            }
+            s.method == Method.POST && path == "/v1/tool" -> {
+                val body = JSONObject(String(readBody(s), Charsets.UTF_8))
+                val tools = ToolSync.fromJson(body)
+                    ?: return error(Response.Status.BAD_REQUEST, Protocol.ERR_BAD_TOOL, body.optString("tool"))
+                rt.toolsFromController(tools)
+                ok(ToolSync.toJson(tools))
             }
             s.method == Method.PUT && path.startsWith("/v1/files/") -> putFile(s, path.removePrefix("/v1/files/"))
             s.method == Method.POST && path == "/v1/display" -> {

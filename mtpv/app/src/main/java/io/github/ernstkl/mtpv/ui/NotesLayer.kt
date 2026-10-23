@@ -39,20 +39,12 @@ import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.NotesGeometry
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.Tool
 import kotlin.random.Random
-
-/** What the stylus does. Widths are relative to the page width. */
-enum class NoteTool(val tool: Tool?, val color: Long, val width: Float) {
-    PEN_BLACK(Tool.PEN, 0xFF000000, 0.0025f),
-    PEN_RED(Tool.PEN, 0xFFD32F2F, 0.0025f),
-    PEN_BLUE(Tool.PEN, 0xFF1565C0, 0.0025f),
-    MARKER(Tool.MARKER, 0xFFFFEB3B, 0.02f),
-    ERASER(null, 0xFFFFFFFF, 0f),
-}
 
 /**
  * Notes over a page; it must exactly cover the rendered page. Normally only the stylus draws (its eraser

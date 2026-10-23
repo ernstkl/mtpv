@@ -14,16 +14,25 @@ package io.github.ernstkl.mtpv.net
  *   POST /v1/display       {controller, version, fileId, page, notes, notesRev, savedRev} -> state;
  *                          409 stale_version (with current version), 404 unknown_file,
  *                          409 notes_unsaved if the shown page has edits newer than savedRev
- *   GET  /v1/state         {fileId, page, version, controller}
+ *   GET  /v1/state         {fileId, page, version, controller, tool, fingers}
  *   GET  /v1/notes         {fileId, page, baseRev, rev, dirty, strokes}: notes of the shown page
- *   GET  /v1/input?after=N {seq, events: ["next" | "prev", ...]}; long poll, answers as soon as
- *                          the secondary has page turns after N, or after INPUT_WAIT_MS with none
+ *   POST /v1/tool          {tool, fingers} -> {tool, fingers}: note tool (a NoteTool name) and finger
+ *                          switch; 400 bad_tool
+ *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off", ...]};
+ *                          long poll, answers
+ *                          as soon as the secondary has input after N, or after INPUT_WAIT_MS with none
  *
  * Pages are 1-based; page 0 (or past the end) shows a blank screen.
  *
  * Notes: the controller holds the authoritative copy and sends a page's strokes with the display
  * command. Before it sends the next command it fetches the shown page's notes (GET /v1/notes) and
  * saves them if dirty, then passes their rev as savedRev.
+ *
+ * Tool: the controller holds the note tool and finger switch last picked on any screen and sends
+ * both with POST /v1/tool (resent when GET /v1/state reports others). A pick on a secondary becomes a
+ * "tool:<name>" or "fingers:on|off" input event, but only after a controller has sent its tool state,
+ * so older controllers never see these events. Older secondaries answer POST /v1/tool with 404 and
+ * keep their own.
  */
 object Protocol {
     const val SERVICE_TYPE = "_mtpv._tcp"
@@ -34,6 +43,7 @@ object Protocol {
     const val ERR_STALE = "stale_version"
     const val ERR_UNKNOWN_FILE = "unknown_file"
     const val ERR_HASH = "hash_mismatch"
+    const val ERR_BAD_TOOL = "bad_tool"
     const val ERR_NOTES_UNSAVED = "notes_unsaved"
     const val ERR_NOT_PAIRED = "not_paired"
 }

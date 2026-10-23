@@ -7,9 +7,12 @@ import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import io.github.ernstkl.mtpv.DisplayState
 import io.github.ernstkl.mtpv.MtpvApp
+import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.NotesJson
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Stroke
+import io.github.ernstkl.mtpv.core.ToolState
+import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.VersionGate
 import io.github.ernstkl.mtpv.net.Protocol
 import fi.iki.elonen.NanoHTTPD
@@ -48,6 +51,13 @@ class SecondaryRuntime(private val app: MtpvApp) {
     private val notesFile = File(app.filesDir, "shown-notes.json")
     private val _notes = MutableStateFlow(loadNotes())
     val notes: StateFlow<ShownNotes> = _notes
+
+    /** Note tool and finger switch; the controller resends its own after a restart of this app. */
+    private val _tools = MutableStateFlow(ToolState())
+    val tools: StateFlow<ToolState> = _tools
+
+    /** A controller has sent its tool state, so it understands tool events. */
+    @Volatile private var toolSync = false
 
     /** Time of the last request from a controller, for the "connected" indicator. */
     private val _lastContact = MutableStateFlow(0L)
@@ -119,6 +129,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         .put("page", d.page)
         .put("version", d.version)
         .put("controller", d.controller ?: "")
+        .let { ToolSync.toJson(_tools.value, it) }
 
     /**
      * Shows [page] with its [notes]. Refused with notes_unsaved while this device has edits that the
@@ -213,13 +224,31 @@ class SecondaryRuntime(private val app: MtpvApp) {
         )
     }.getOrDefault(ShownNotes(null, 0, 0, 0, false, emptyList()))
 
-    // --- page turns entered on this device, fetched by the controller via long polling ---
+    // --- note tool and finger switch, the same on all screens ---
+
+    /** Picked on this screen: passed on to the controller, which picks it on the other screens. */
+    fun pickTool(t: NoteTool) {
+        _tools.value = _tools.value.copy(tool = t)
+        if (toolSync) sendInput(ToolSync.event(t))
+    }
+
+    fun setFingers(on: Boolean) {
+        _tools.value = _tools.value.copy(fingers = on)
+        if (toolSync) sendInput(ToolSync.event(on))
+    }
+
+    fun toolsFromController(t: ToolState) {
+        toolSync = true
+        _tools.value = t
+    }
+
+    // --- page turns and tool picks entered on this device, fetched by the controller via long polling ---
 
     private val inputLock = Object()
     private var inputSeq = 0L
     private val recentInput = ArrayDeque<Pair<Long, String>>()
 
-    /** Queues [action] ("next" or "prev") for the controller. */
+    /** Queues [action] ("next", "prev" or a tool event) for the controller. */
     fun sendInput(action: String) = synchronized(inputLock) {
         inputSeq++
         recentInput.addLast(inputSeq to action)

@@ -3,6 +3,7 @@ package io.github.ernstkl.mtpv.controller
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.PdfCache
+import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.net.Endpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -42,8 +43,8 @@ interface NotesHub {
  * Keeps one secondary in line with its [Target]: verifies its identity, uploads the PDF if it is
  * missing, sends the page, and keeps checking it every few seconds. Only the latest target matters,
  * so missed page turns are never replayed. Before a secondary gets a new page, the notes on its
- * current page are fetched and saved, so they are never lost. A second loop forwards page turns entered on the
- * secondary to [onInput].
+ * current page are fetched and saved, so they are never lost. Once the page is right, note tool and
+ * finger switch follow. A second loop forwards page turns and tool picks entered on the secondary to [onInput].
  */
 class SecondaryLink(
     private val uuid: String,
@@ -55,6 +56,7 @@ class SecondaryLink(
     private val onInput: (String) -> Unit,
 ) {
     @Volatile private var target: Target? = null
+    @Volatile private var tools: ToolState? = null
     @Volatile private var endpoint: Endpoint? = null
     @Volatile private var token: String? = null
 
@@ -65,6 +67,12 @@ class SecondaryLink(
     fun setTarget(t: Target?) {
         if (t == target) return
         target = t
+        wake.trySend(Unit)
+    }
+
+    fun setTools(t: ToolState) {
+        if (t == tools) return
+        tools = t
         wake.trySend(Unit)
     }
 
@@ -96,6 +104,8 @@ class SecondaryLink(
         }
 
         var applied: Target? = null
+        var appliedTools: ToolState? = null
+        var toolSync = true
         var files = emptySet<String>()
         var backoff = 1_000L
 
@@ -114,6 +124,8 @@ class SecondaryLink(
                     if (info.uuid != uuid) throw IOException("a different device answers at $ep")
                     files = client.files()
                     applied = null
+                    appliedTools = null
+                    toolSync = true
                     verified = ep
                     publish(LinkStatus(online = true))
                 }
@@ -150,12 +162,19 @@ class SecondaryLink(
                     publish(LinkStatus(online = true, shownPage = applied?.page))
                     continue
                 }
+                val t = tools
+                if (t != null && toolSync && t != appliedTools) {
+                    toolSync = client.tools(t)
+                    appliedTools = t
+                    continue
+                }
                 backoff = 1_000L
                 val woken = withTimeoutOrNull(PING_MS) { wake.receive() }
                 if (woken == null) {
                     // Ping, and resend if the secondary shows something else (restarted, other controller).
                     val st = client.state()
                     if (applied != null && (st.fileId != applied.fileId || st.page != applied.page)) applied = null
+                    if (toolSync && st.tools != appliedTools) appliedTools = null
                 }
             } catch (e: NotPairedException) {
                 // Only a new pairing (setToken) helps; wait for it.

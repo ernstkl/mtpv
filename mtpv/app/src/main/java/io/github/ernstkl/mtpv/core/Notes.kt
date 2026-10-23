@@ -1,8 +1,53 @@
 package io.github.ernstkl.mtpv.core
 
+import org.json.JSONObject
 import kotlin.math.hypot
 
 enum class Tool { PEN, MARKER }
+
+/** What the stylus does. Widths are relative to the page width. */
+enum class NoteTool(val tool: Tool?, val color: Long, val width: Float) {
+    PEN_BLACK(Tool.PEN, 0xFF000000, 0.0025f),
+    PEN_RED(Tool.PEN, 0xFFD32F2F, 0.0025f),
+    PEN_BLUE(Tool.PEN, 0xFF1565C0, 0.0025f),
+    MARKER(Tool.MARKER, 0xFFFFEB3B, 0.02f),
+    ERASER(null, 0xFFFFFFFF, 0f),
+}
+
+/** How notes are drawn on every screen: the tool, and whether a finger draws too (the stylus always does). */
+data class ToolState(val tool: NoteTool = NoteTool.PEN_BLACK, val fingers: Boolean = false)
+
+/**
+ * The tool state picked on one screen is picked on all of them. A secondary reports a pick to the
+ * controller as an input event, "tool:<name>" or "fingers:on|off"; the controller sends the whole
+ * state as JSON {tool, fingers}.
+ */
+object ToolSync {
+    private const val TOOL = "tool:"
+    private const val FINGERS = "fingers:"
+
+    fun event(tool: NoteTool) = TOOL + tool.name
+
+    fun event(fingers: Boolean) = FINGERS + if (fingers) "on" else "off"
+
+    /** [state] with the pick from input event [e], or null if it is another event. */
+    fun apply(state: ToolState, e: String): ToolState? = when {
+        e.startsWith(TOOL) -> parse(e.removePrefix(TOOL))?.let { state.copy(tool = it) }
+        e == event(true) -> state.copy(fingers = true)
+        e == event(false) -> state.copy(fingers = false)
+        else -> null
+    }
+
+    /** Null for an empty or unknown name, e.g. a tool that only a newer version has. */
+    fun parse(name: String): NoteTool? = NoteTool.entries.firstOrNull { it.name == name }
+
+    fun toJson(state: ToolState, into: JSONObject = JSONObject()): JSONObject =
+        into.put("tool", state.tool.name).put("fingers", state.fingers)
+
+    /** Null if [json] names no known tool. */
+    fun fromJson(json: JSONObject): ToolState? =
+        parse(json.optString("tool"))?.let { ToolState(it, json.optBoolean("fingers")) }
+}
 
 /**
  * One handwritten stroke. Coordinates are relative to the page (0..1 on each axis), and [width] is

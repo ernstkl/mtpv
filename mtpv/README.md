@@ -34,7 +34,8 @@ Notes: write with the stylus on any screen; fingers keep turning pages. The dot 
 corner picks black/red/blue pen, yellow marker or eraser (whole strokes; the stylus eraser end works
 too). Without a stylus, tap the square finger switch left of the dot (green = on): a finger then
 draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
-The switch is per screen. Notes belong to the PDF's content: a changed PDF starts without notes.
+Tool and finger switch are the same on all screens, like one big sheet of paper: what you pick on
+one screen is picked on all of them. The stylus draws on every screen whatever the switch says. Notes belong to the PDF's content: a changed PDF starts without notes.
 
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
 On a secondary, long-press for its address and to change the role.
@@ -56,7 +57,9 @@ On a secondary, long-press for its address and to change the role.
   secondary was offline, all strokes are kept.
 - The controller runs one `SecondaryLink` per secondary that converges it to its target page,
   uploads the PDF if needed and pings every 3 s. It also keeps a long-poll request (`GET /v1/input`)
-  open on each secondary, which answers as soon as someone turns a page there.
+  open on each secondary, which answers as soon as someone turns a page or picks a tool there.
+- Note tool and finger switch work the same way: the controller holds the last ones picked on any
+  screen and sends them to every secondary (`POST /v1/tool`).
 
 While a role is active, a foreground service (with a notification) keeps the app running when it is not
 on screen, so a secondary keeps serving and the controller keeps receiving page turns.

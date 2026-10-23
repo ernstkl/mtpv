@@ -2,6 +2,8 @@ package io.github.ernstkl.mtpv.controller
 
 import io.github.ernstkl.mtpv.core.NotesJson
 import io.github.ernstkl.mtpv.core.Stroke
+import io.github.ernstkl.mtpv.core.ToolState
+import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.net.Endpoint
 import io.github.ernstkl.mtpv.net.Protocol
 import org.json.JSONObject
@@ -18,7 +20,8 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
 
     data class Info(val uuid: String, val name: String)
     data class PairStatus(val status: String, val token: String?)
-    data class State(val fileId: String?, val page: Int, val version: Long)
+    /** [tools] is null from secondaries without tool sync. */
+    data class State(val fileId: String?, val page: Int, val version: Long, val tools: ToolState?)
     data class Notes(val fileId: String?, val page: Int, val baseRev: Long, val rev: Long, val dirty: Boolean, val strokes: List<Stroke>)
 
     sealed interface DisplayResult {
@@ -60,7 +63,18 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
         )
     }
 
-    /** Waits for page turns entered on the secondary; returns the new sequence number and the actions. */
+    /** Sets note tool and finger switch on the secondary; false if it is too old for tool sync. */
+    fun tools(tools: ToolState): Boolean {
+        val body = ToolSync.toJson(tools).toString().toByteArray()
+        val (code, json) = request("POST", "/v1/tool", body, acceptErrors = true)
+        return when (code) {
+            200 -> true
+            404 -> false
+            else -> throw IOException("tool failed: HTTP $code ${json.optString("message")}")
+        }
+    }
+
+    /** Waits for page turns and tool picks entered on the secondary; returns the new sequence number and the events. */
     fun input(after: Long): Pair<Long, List<String>> {
         val (_, json) = request("GET", "/v1/input?after=$after", readTimeoutMs = (Protocol.INPUT_WAIT_MS + 5_000).toInt())
         val events = json.getJSONArray("events").let { a -> List(a.length()) { a.getString(it) } }
@@ -175,6 +189,7 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
             fileId = json.optString("fileId").ifEmpty { null },
             page = json.optInt("page"),
             version = json.optLong("version"),
+            tools = ToolSync.fromJson(json),
         )
     }
 }

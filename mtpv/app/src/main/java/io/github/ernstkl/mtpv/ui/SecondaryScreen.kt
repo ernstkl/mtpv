@@ -21,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,8 +49,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
     val connected = now - lastContact < 10_000
     var showInfo by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
-    var tool by rememberSaveable { mutableStateOf(NoteTool.PEN_BLACK) }
-    var fingers by rememberSaveable { mutableStateOf(false) }
+    val tools by rt.tools.collectAsStateWithLifecycle()
 
     Box(
         Modifier
@@ -71,13 +69,13 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
             val notes by rt.notes.collectAsStateWithLifecycle()
             if (notes.fileId == fileId && notes.page == page) {
                 NotesLayer(
-                    PageKey(fileId, page), notes.strokes, tool, enabled = true,
-                    onChange = rt::editNotes, onPen = rt::setPenDown, fingers = fingers,
+                    PageKey(fileId, page), notes.strokes, tools.tool, enabled = true,
+                    onChange = rt::editNotes, onPen = rt::setPenDown, fingers = tools.fingers,
                 )
             }
         }
         if (display.fileId != null && display.page > 0) {
-            NoteToolPicker(tool, { tool = it }, fingers, { fingers = it }, Modifier.align(Alignment.BottomStart).padding(8.dp))
+            NoteToolPicker(tools.tool, rt::pickTool, tools.fingers, rt::setFingers, Modifier.align(Alignment.BottomStart).padding(8.dp))
         }
 
         if (display.fileId == null) {

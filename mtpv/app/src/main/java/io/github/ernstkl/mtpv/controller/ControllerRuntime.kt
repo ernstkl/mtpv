@@ -6,10 +6,13 @@ import io.github.ernstkl.mtpv.ControllerSession
 import io.github.ernstkl.mtpv.KnownSecondary
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.controllerSupported
+import io.github.ernstkl.mtpv.core.NoteTool
+import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Paging
 import io.github.ernstkl.mtpv.core.Stroke
+import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.net.Endpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +37,8 @@ data class ControllerState(
     val links: Map<String, LinkStatus> = emptyMap(),
     /** Page shown on each secondary, whose notes may have unsaved edits there. */
     val held: Map<String, PageKey> = emptyMap(),
+    /** Note tool and finger switch on every screen: the last ones picked on any of them. */
+    val tools: ToolState = ToolState(),
     /** Secondaries found on the network that are not paired with this controller. */
     val nearby: Map<String, KnownSecondary> = emptyMap(),
     val pairing: PairingUi? = null,
@@ -64,7 +69,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private val links = mutableMapOf<String, Pair<SecondaryLink, Job>>()
     private var discovery: Discovery? = null
 
-    private val _state = MutableStateFlow(ControllerState(restoreSession()))
+    private val _state = MutableStateFlow(ControllerState(restoreSession(), tools = prefs.tools))
     val state: StateFlow<ControllerState> = _state
 
     private fun restoreSession(): ControllerSession {
@@ -267,6 +272,18 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         it.copy(held = if (key == null) it.held - uuid else it.held + (uuid to key))
     }
 
+    fun setTool(t: NoteTool) = setTools(_state.value.tools.copy(tool = t))
+
+    fun setFingers(on: Boolean) = setTools(_state.value.tools.copy(fingers = on))
+
+    /** Picked here or on a secondary (main thread); every screen follows. */
+    private fun setTools(t: ToolState) {
+        if (t == _state.value.tools) return
+        _state.update { it.copy(tools = t) }
+        prefs.tools = t
+        links.values.forEach { it.first.setTools(t) }
+    }
+
     fun clearMessage() = _state.update { it.copy(message = null) }
 
     private fun showMessage(m: String) = _state.update { it.copy(message = m) }
@@ -298,7 +315,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 val l = SecondaryLink(
                     uuid, prefs.deviceUuid, cache, versions, this,
                     report = { status -> _state.update { it.copy(links = it.links + (uuid to status)) } },
-                    onInput = { action -> scope.launch(Dispatchers.Main) { if (action == "prev") prev() else next() } },
+                    onInput = { event -> scope.launch(Dispatchers.Main) { onInput(event) } },
                 )
                 l to l.launchIn(scope)
             }.first
@@ -307,6 +324,15 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 link.setToken(k.token)
             }
             link.setTarget(s.fileId?.let { Target(it, st.pageForSlot(slot)) })
+            link.setTools(st.tools)
+        }
+    }
+
+    private fun onInput(event: String) {
+        when (event) {
+            "prev" -> prev()
+            "next" -> next()
+            else -> ToolSync.apply(_state.value.tools, event)?.let(::setTools)
         }
     }
 

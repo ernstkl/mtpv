@@ -2,6 +2,7 @@ package io.github.ernstkl.mtpv.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,5 +43,30 @@ class NotesGeometryTest {
     fun singleDot() {
         val dot = Stroke(2, Tool.PEN, 0, 0.01f, floatArrayOf(0.5f, 0.5f))
         assertTrue(NotesGeometry.hits(dot, 505f, 1000f, 1000f, 2000f, slop = 6f))
+    }
+}
+
+class ToolSyncTest {
+    private val start = ToolState(NoteTool.PEN_BLACK, fingers = false)
+
+    @Test
+    fun toolEventChangesOnlyTheTool() {
+        NoteTool.entries.forEach { assertEquals(ToolState(it, false), ToolSync.apply(start, ToolSync.event(it))) }
+        assertEquals(ToolState(NoteTool.MARKER, true), ToolSync.apply(ToolState(NoteTool.PEN_RED, true), ToolSync.event(NoteTool.MARKER)))
+    }
+
+    @Test
+    fun fingersEventChangesOnlyTheSwitch() {
+        assertEquals(ToolState(NoteTool.PEN_RED, true), ToolSync.apply(ToolState(NoteTool.PEN_RED, false), ToolSync.event(true)))
+        assertEquals(ToolState(NoteTool.PEN_RED, false), ToolSync.apply(ToolState(NoteTool.PEN_RED, true), ToolSync.event(false)))
+    }
+
+    @Test
+    fun pageTurnsAndUnknownToolsAreNoToolEvents() {
+        assertNull(ToolSync.apply(start, "next"))
+        assertNull(ToolSync.apply(start, "prev"))
+        assertNull(ToolSync.apply(start, "tool:LASER"))
+        assertNull(ToolSync.apply(start, "fingers:maybe"))
+        assertNull(ToolSync.parse(""))
     }
 }

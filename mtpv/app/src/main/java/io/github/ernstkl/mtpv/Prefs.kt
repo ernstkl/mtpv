@@ -5,6 +5,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.annotation.ChecksSdkIntAtLeast
 import io.github.ernstkl.mtpv.core.Paging
+import io.github.ernstkl.mtpv.core.ToolState
+import io.github.ernstkl.mtpv.core.ToolSync
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -54,6 +56,11 @@ class Prefs(private val context: Context) {
     var aboutShown: Boolean
         get() = sp.getBoolean("aboutShown", false)
         set(value) = sp.edit().putBoolean("aboutShown", value).apply()
+
+    /** The controller's note tool and finger switch, the same on all screens. */
+    var tools: ToolState
+        get() = sp.getString("tools", null)?.let { runCatching { ToolSync.fromJson(JSONObject(it)) }.getOrNull() } ?: ToolState()
+        set(value) = sp.edit().putString("tools", ToolSync.toJson(value).toString()).apply()
 
     var lastVersion: Long
         get() = sp.getLong("lastVersion", 0)
