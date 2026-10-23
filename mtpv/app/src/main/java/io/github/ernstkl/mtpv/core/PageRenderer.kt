@@ -53,6 +53,8 @@ class RendererHolder(private val cache: PdfCache) {
         return renderer
     }
 
+    /** Synchronized so that a [get] for another file cannot close the renderer between lookup and render. */
+    @Synchronized
     fun render(fileId: String?, page: Int, maxW: Int, maxH: Int): Bitmap? =
         fileId?.let { get(it) }?.render(page, maxW, maxH)
 }

@@ -15,6 +15,8 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
 
     override fun serve(session: IHTTPSession): Response = try {
         route(session)
+    } catch (e: BodyTooLargeException) {
+        error(Response.Status.PAYLOAD_TOO_LARGE, Protocol.ERR_TOO_LARGE, e.message)
     } catch (e: HashMismatchException) {
         error(Response.Status.CONFLICT, Protocol.ERR_HASH, e.message)
     } catch (e: Exception) {
@@ -86,7 +88,10 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
     private fun contentLength(s: IHTTPSession): Long? = s.headers["content-length"]?.toLongOrNull()
 
     private fun readBody(s: IHTTPSession): ByteArray {
-        val length = contentLength(s)?.toInt() ?: 0
+        val declared = contentLength(s) ?: 0
+        // Checked before allocating: /v1/pair is open to anyone on the network.
+        if (declared !in 0..Protocol.MAX_JSON_BODY) throw BodyTooLargeException("Content-Length $declared")
+        val length = declared.toInt()
         val buf = ByteArray(length)
         var off = 0
         while (off < length) {
@@ -106,6 +111,8 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
             remaining -= n
         }
     }
+
+    private class BodyTooLargeException(message: String) : Exception(message)
 
     companion object {
         fun ok(json: JSONObject): Response = json(Response.Status.OK, json)

@@ -26,6 +26,8 @@ package io.github.ernstkl.mtpv.net
  *                          notification (Android lets no app jump to the front from the background);
  *                          shown tells whether it was on screen already.
  *
+ * JSON request bodies larger than MAX_JSON_BODY (or with a negative Content-Length) get 413 too_large.
+ *
  * Pages are 1-based; page 0 (or past the end) shows a blank screen.
  *
  * Notes: the controller holds the authoritative copy and sends a page's strokes with the display
@@ -48,6 +50,7 @@ object Protocol {
     const val API_VERSION = 1
     const val DEFAULT_PORT = 8765
     const val INPUT_WAIT_MS = 20_000L
+    const val MAX_JSON_BODY = 16L * 1024 * 1024
 
     const val ERR_STALE = "stale_version"
     const val ERR_UNKNOWN_FILE = "unknown_file"
@@ -55,6 +58,7 @@ object Protocol {
     const val ERR_BAD_TOOL = "bad_tool"
     const val ERR_NOTES_UNSAVED = "notes_unsaved"
     const val ERR_NOT_PAIRED = "not_paired"
+    const val ERR_TOO_LARGE = "too_large"
 }
 
 data class Endpoint(val host: String, val port: Int) {
