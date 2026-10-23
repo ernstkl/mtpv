@@ -115,7 +115,7 @@ class Folders(private val context: Context) {
                 }
             }
             val excluded = o.optJSONArray("excluded")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty().toSet()
-            SetRecord(o.optString("folder", o.optString("treeUri")), o.getString("name"), order, files, excluded)
+            SetRecord(o.getString("folder"), o.getString("name"), order, files, excluded)
         }.getOrNull()
     }
 

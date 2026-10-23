@@ -226,7 +226,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     fun reloadFolder() {
-        _state.value.session.folder?.let { openFolder(Folders.folderOf(Uri.parse(it))) }
+        _state.value.session.folder?.let { openFolder(Uri.parse(it)) }
     }
 
     // --- library ---
@@ -284,7 +284,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     /** The open set's folder and, if the provider can tell, the library folders above it. */
     private fun openPath(tree: Uri): List<String> {
-        val open = _state.value.session.folder?.let { Folders.folderOf(Uri.parse(it)) } ?: return emptyList()
+        val open = _state.value.session.folder?.let(Uri::parse) ?: return emptyList()
         if (open.authority != tree.authority) return emptyList()
         val id = DocumentsContract.getDocumentId(open)
         return folders.pathTo(tree, id) ?: listOf(id)
@@ -316,7 +316,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             s.copy(set = changed, start = start)
         }
         val s = _state.value.session
-        val folder = s.folder?.let { Folders.folderOf(Uri.parse(it)) } ?: return
+        val folder = s.folder?.let(Uri::parse) ?: return
         val songs = s.set?.songs ?: return
         val names = songs.map { it.name }
         val excluded = songs.filter { it.excluded }.map { it.name }.toSet()
