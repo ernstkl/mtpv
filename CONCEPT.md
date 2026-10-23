@@ -6,12 +6,14 @@ A brief architectural overview. Build, usage and protocol details: [`mtpv/README
 
 One app with two roles, chosen once per device and restored at every start:
 
-- The **controller** owns the session: the PDF, the first page shown, and the arrangement of screens
-  (an ordered list of slots, one of which is the controller itself).
+- The **controller** owns the session: the song set, the first page shown, and the arrangement of
+  screens (an ordered list of slots, one of which is the controller itself). A song set is an
+  ordered list of PDFs whose pages follow each other like one long PDF; a single PDF is a set of
+  one song, a folder of PDFs a set in the order stored for that folder.
 - A **secondary** is a passive screen, like an extra monitor. It shows whatever page the controller
   tells it to and reports page turns and notes back.
 
-Slot *i* shows page *start + i*; slots past the last page show an empty-set sign (∅), and *start* goes
+Slot *i* shows page *start + i* of that stream, which the controller maps to a file and a page in it; slots past the last page show an empty-set sign (∅), and *start* goes
 up to the last page. A page turn on any screen moves *start* by one, so every screen moves by one page.
 
 ```
@@ -43,6 +45,9 @@ up to the last page. A page turn on any screen moves *start* by one, so every sc
   simply converges again; nothing needs to be resynchronised by hand.
 - **Versioned display commands.** Each command carries a strictly increasing, persisted version, so a
   late or repeated request can never move a screen backwards.
+- **Sets live on the controller only.** A secondary gets single (file, page) targets and never
+  learns about sets, so song sets needed no protocol change. Each PDF is copied into the
+  controller's cache, so a file changing in the folder cannot change content under a known hash.
 - **Content-addressed files.** PDFs are identified by their SHA-256, uploaded once and cached on both
   sides. Notes are keyed by the same hash, so a changed PDF starts with no notes.
 - **Single owner for notes.** The controller holds the authoritative copy of all notes. A secondary
