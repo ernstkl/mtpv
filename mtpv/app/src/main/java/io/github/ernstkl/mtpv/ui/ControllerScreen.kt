@@ -185,7 +185,7 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
                 s.arrangement.forEachIndexed { slot, id ->
                     val page = st.pageForSlot(slot)
                     // Name and status get the full width; the buttons go on their own line below.
-                    if (slot > 0) Spacer(Modifier.height(8.dp))
+                    if (slot > 0) HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (id != Paging.SELF) {
                             Box(Modifier.size(10.dp).background(colorFor(st.links[id]), CircleShape))
@@ -212,9 +212,10 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
 
                 val nearby = st.nearby.values.filter { it.uuid !in s.known }
                 if (nearby.isNotEmpty()) {
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    SectionDivider()
                     Text("Nearby, not paired", style = MaterialTheme.typography.labelLarge)
-                    nearby.forEach { k ->
+                    nearby.forEachIndexed { i, k ->
+                        if (i > 0) HorizontalDivider()
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("${k.name} (${k.uuid.take(4)})", Modifier.weight(1f))
                             TextButton(onClick = { rt.pair(k.uuid) }) { Text("Pair") }
@@ -224,9 +225,10 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
 
                 val others = s.known.keys.filter { it !in s.arrangement }
                 if (others.isNotEmpty()) {
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    SectionDivider()
                     Text("Known, not used", style = MaterialTheme.typography.labelLarge)
-                    others.forEach { id ->
+                    others.forEachIndexed { i, id ->
+                        if (i > 0) HorizontalDivider()
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(nameOf(st, id), Modifier.weight(1f))
                             TextButton(onClick = { rt.include(id) }) { Text("Add") }
@@ -235,7 +237,7 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
                     }
                 }
 
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                SectionDivider()
                 Text(
 "Secondaries on the same Wi-Fi appear under Nearby. Pair one, then tap Allow on it. If it does not " +
                         "appear, enter the address shown on the secondary.",
@@ -266,6 +268,11 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
 }
+
+/** Between the sections of the Screens dialog; stronger than the thin lines between devices. */
+@Composable
+private fun SectionDivider() =
+    HorizontalDivider(Modifier.padding(vertical = 8.dp), thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
 
 private fun nameOf(st: ControllerState, uuid: String): String =
     "${st.session.known[uuid]?.name ?: "Unknown"} (${uuid.take(4)})"

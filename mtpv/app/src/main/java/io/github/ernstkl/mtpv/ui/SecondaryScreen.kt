@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -141,7 +142,8 @@ private fun PairedControllers(rt: SecondaryRuntime) {
     Spacer(Modifier.height(12.dp))
     Text("Paired controllers", style = MaterialTheme.typography.labelLarge)
     if (paired.isEmpty()) Text("none")
-    paired.forEach { p ->
+    paired.forEachIndexed { i, p ->
+        if (i > 0) HorizontalDivider()
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${p.name} (${p.uuid.take(4)})", Modifier.weight(1f))
             TextButton(onClick = { rt.pairing.remove(p.uuid) }) { Text("Remove") }
