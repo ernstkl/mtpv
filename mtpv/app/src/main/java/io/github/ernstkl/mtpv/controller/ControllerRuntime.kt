@@ -151,35 +151,44 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         }
     }
 
+    /** A folder picked with the system's folder picker: keeps access to it, then opens it. */
+    fun openPickedFolder(tree: Uri) {
+        try {
+            folders.keepAccess(tree)
+        } catch (e: SecurityException) {
+            showMessage("Could not keep access to the folder: ${e.message}")
+        }
+        openFolder(Folders.folderOf(tree))
+    }
+
     /**
-     * The PDFs in folder [tree] become a set, in the order stored for that folder: files still
-     * there keep their places, new ones go to the end. Files that are no readable PDF or have no
-     * pages are left out quietly.
+     * The PDFs in [folder] (a document URI) become a set, in the order stored for that folder:
+     * files still there keep their places, new ones go to the end. Files that are no readable PDF
+     * or have no pages are left out quietly.
      */
-    fun openFolder(tree: Uri) {
+    fun openFolder(folder: Uri) {
         scope.launch {
             _state.update { it.copy(busy = "Reading folder…") }
             try {
-                folders.keepAccess(tree)
-                val name = folders.name(tree)
-                val present = folders.pdfs(tree).associateBy { it.name }
-                val old = folders.load(tree)
+                val name = folders.name(folder)
+                val present = folders.pdfs(folder).associateBy { it.name }
+                val old = folders.load(folder)
                 val order = SetOrder.merge(old?.order.orEmpty(), present.keys)
                 val stored = order.mapIndexedNotNull { i, n ->
                     _state.update { it.copy(busy = "Loading ${i + 1} of ${order.size}…") }
                     val f = present.getValue(n)
-                    old?.unchanged(f)?.takeIf { it.pageCount == 0 || cache.has(it.fileId) } ?: copy(tree, f)
+                    old?.unchanged(f)?.takeIf { it.pageCount == 0 || cache.has(it.fileId) } ?: copy(folder, f)
                 }
                 val excluded = old?.excluded.orEmpty() intersect present.keys
-                folders.save(tree, SetRecord(tree.toString(), name, order, stored, excluded))
+                folders.save(folder, SetRecord(folder.toString(), name, order, stored, excluded))
                 val set = SongSet.of(name, stored.map { Song(it.file.name, it.fileId, it.pageCount, it.file.name in excluded) })
                 if (set.songs.isEmpty()) error("no PDFs in $name")
                 withContext(Dispatchers.Main) {
                     updateSession { s ->
                         // Reading the same folder again keeps the page on the first screen, if it is still there.
-                        val same = s.folder == tree.toString()
+                        val same = s.folder == folder.toString()
                         val first = if (same) s.set?.locate(s.start)?.let(set::pageOf) ?: 0 else 0
-                        s.copy(set = set, folder = tree.toString(), start = first.coerceAtLeast(1))
+                        s.copy(set = set, folder = folder.toString(), start = first.coerceAtLeast(1))
                     }
                 }
                 cache.evict(set.songs.map { it.fileId }.toSet())
@@ -192,7 +201,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     fun reloadFolder() {
-        _state.value.session.folder?.let { openFolder(Uri.parse(it)) }
+        _state.value.session.folder?.let { openFolder(Folders.folderOf(Uri.parse(it))) }
     }
 
     // --- songs ---
@@ -221,20 +230,20 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             s.copy(set = changed, start = start)
         }
         val s = _state.value.session
-        val tree = s.folder?.let(Uri::parse) ?: return
+        val folder = s.folder?.let { Folders.folderOf(Uri.parse(it)) } ?: return
         val songs = s.set?.songs ?: return
         val names = songs.map { it.name }
         val excluded = songs.filter { it.excluded }.map { it.name }.toSet()
         scope.launch(orderWrites) {
-            folders.load(tree)?.let { r ->
-                folders.save(tree, r.copy(order = SetOrder.reordered(r.order, names), excluded = excluded))
+            folders.load(folder)?.let { r ->
+                folders.save(folder, r.copy(order = SetOrder.reordered(r.order, names), excluded = excluded))
             }
         }
     }
 
     /** Copies [f] into the cache; null if it cannot be read now, page count 0 if it is no PDF. */
-    private fun copy(tree: Uri, f: FolderFile): StoredFile? {
-        val id = runCatching { folders.open(tree, f).use { cache.store(it) } }.getOrNull() ?: return null
+    private fun copy(folder: Uri, f: FolderFile): StoredFile? {
+        val id = runCatching { folders.open(folder, f).use { cache.store(it) } }.getOrNull() ?: return null
         val count = runCatching { PageRenderer(cache.file(id)).use { it.pageCount } }.getOrDefault(0)
         return StoredFile(f, id, count)
     }

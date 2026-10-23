@@ -12,7 +12,7 @@ data class StoredFile(val file: FolderFile, val fileId: String, val pageCount: I
  * not be read and hashed again.
  */
 data class SetRecord(
-    val treeUri: String,
+    val folder: String,
     val name: String,
     val order: List<String>,
     val files: List<StoredFile>,

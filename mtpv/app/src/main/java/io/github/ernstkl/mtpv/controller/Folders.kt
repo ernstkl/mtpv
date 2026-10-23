@@ -17,26 +17,25 @@ import java.security.MessageDigest
 
 /**
  * Folders of PDFs, reached through the Storage Access Framework, and what the app remembers about
- * each of them in filesDir/sets/<key>.json. The key is the hash of the folder's document ID, not of
- * the tree URI, so the same folder is recognised however it was picked.
+ * each of them in filesDir/sets/<key>.json. A folder is a document URI below a granted tree: the
+ * picked folder itself, or one below the library folder. The key is the hash of the folder's
+ * document ID, not of the URI, so the same folder is recognised however it was reached.
  */
 class Folders(private val context: Context) {
     private val dir = File(context.filesDir, "sets").apply { mkdirs() }
     private val resolver get() = context.contentResolver
 
-    /** Keeps read access to [tree] across restarts. */
+    /** Keeps read access to the picked [tree] across restarts. */
     fun keepAccess(tree: Uri) = resolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
-    fun name(tree: Uri): String {
-        val doc = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-        return resolver.query(doc, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { c ->
+    fun name(folder: Uri): String =
+        resolver.query(folder, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) c.getString(0) else null
-        } ?: tree.lastPathSegment ?: "Folder"
-    }
+        } ?: DocumentsContract.getDocumentId(folder).substringAfterLast('/')
 
     /** PDFs directly in the folder; subfolders are not looked into. */
-    fun pdfs(tree: Uri): List<FolderFile> {
-        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+    fun pdfs(folder: Uri): List<FolderFile> {
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(folder, DocumentsContract.getDocumentId(folder))
         val columns = arrayOf(
             Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE,
             Document.COLUMN_SIZE, Document.COLUMN_LAST_MODIFIED,
@@ -58,12 +57,12 @@ class Folders(private val context: Context) {
         return files
     }
 
-    fun open(tree: Uri, f: FolderFile): InputStream =
-        resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(tree, f.documentId))
+    fun open(folder: Uri, f: FolderFile): InputStream =
+        resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(folder, f.documentId))
             ?: throw IOException("cannot read ${f.name}")
 
-    fun load(tree: Uri): SetRecord? {
-        val f = file(tree)
+    fun load(folder: Uri): SetRecord? {
+        val f = file(folder)
         if (!f.isFile) return null
         return runCatching {
             val o = JSONObject(f.readText())
@@ -77,11 +76,11 @@ class Folders(private val context: Context) {
                 }
             }
             val excluded = o.optJSONArray("excluded")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty().toSet()
-            SetRecord(o.getString("treeUri"), o.getString("name"), order, files, excluded)
+            SetRecord(o.optString("folder", o.optString("treeUri")), o.getString("name"), order, files, excluded)
         }.getOrNull()
     }
 
-    fun save(tree: Uri, r: SetRecord) {
+    fun save(folder: Uri, r: SetRecord) {
         val files = JSONArray()
         r.files.forEach {
             files.put(
@@ -89,18 +88,28 @@ class Folders(private val context: Context) {
                     .put("lastModified", it.file.lastModified).put("fileId", it.fileId).put("pageCount", it.pageCount)
             )
         }
-        val o = JSONObject().put("treeUri", r.treeUri).put("name", r.name).put("order", JSONArray(r.order)).put("files", files)
+        val o = JSONObject().put("folder", r.folder).put("name", r.name).put("order", JSONArray(r.order)).put("files", files)
             .put("excluded", JSONArray(r.excluded.toList()))
             .put("lastOpened", System.currentTimeMillis())
-        val f = file(tree)
+        val f = file(folder)
         val tmp = File(dir, f.name + ".tmp")
         tmp.writeText(o.toString())
         tmp.renameTo(f)
     }
 
-    private fun file(tree: Uri): File {
-        val id = "${tree.authority}\n${DocumentsContract.getTreeDocumentId(tree)}"
+    private fun file(folder: Uri): File {
+        val id = "${folder.authority}\n${DocumentsContract.getDocumentId(folder)}"
         val key = MessageDigest.getInstance("SHA-256").digest(id.toByteArray()).joinToString("") { "%02x".format(it) }
         return File(dir, "$key.json")
+    }
+
+    companion object {
+        /** The folder a URI stands for: a picked tree becomes the document URI of its top folder. */
+        fun folderOf(uri: Uri): Uri =
+            if (DocumentsContract.isTreeUri(uri) && uri.pathSegments.size < 4) {
+                DocumentsContract.buildDocumentUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri))
+            } else {
+                uri
+            }
     }
 }

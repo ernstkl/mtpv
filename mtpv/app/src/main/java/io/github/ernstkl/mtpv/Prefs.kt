@@ -30,7 +30,7 @@ data class PairedController(val uuid: String, val name: String, val token: Strin
 
 /**
  * What the controller restores at the next start. [start] is a page in the stream of the set's
- * pages; [folder] is the tree URI the set was read from, null for a single PDF.
+ * pages; [folder] is the document URI of the folder the set was read from, null for a single PDF.
  */
 data class ControllerSession(
     val set: SongSet?,

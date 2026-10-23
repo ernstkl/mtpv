@@ -68,7 +68,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
         uri?.let(rt::openPdf)
     }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        uri?.let(rt::openFolder)
+        uri?.let(rt::openPickedFolder)
     }
 
     Box(
