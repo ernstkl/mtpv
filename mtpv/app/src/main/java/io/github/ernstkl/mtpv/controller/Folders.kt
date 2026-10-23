@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import io.github.ernstkl.mtpv.core.FolderFile
+import io.github.ernstkl.mtpv.core.Library
 import io.github.ernstkl.mtpv.core.SetRecord
 import io.github.ernstkl.mtpv.core.StoredFile
 import org.json.JSONArray
@@ -46,7 +47,7 @@ class Folders(private val context: Context) {
                 val name = c.getString(1) ?: continue
                 val mime = c.getString(2)
                 if (mime == Document.MIME_TYPE_DIR) continue
-                if (mime != "application/pdf" && !name.endsWith(".pdf", ignoreCase = true)) continue
+                if (!Library.isPdf(name, mime)) continue
                 files += FolderFile(
                     name, c.getString(0),
                     size = if (c.isNull(3)) -1 else c.getLong(3),
