@@ -14,6 +14,7 @@ import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Paging
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolSync
+import io.github.ernstkl.mtpv.core.moved
 import io.github.ernstkl.mtpv.net.Endpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -168,13 +169,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         }
     }
 
-    fun move(slot: Int, delta: Int) = updateSession { s ->
-        val to = slot + delta
-        if (slot !in s.arrangement.indices || to !in s.arrangement.indices) return@updateSession s
-        val list = s.arrangement.toMutableList()
-        list.add(to, list.removeAt(slot))
-        s.copy(arrangement = list)
-    }
+    fun move(slot: Int, delta: Int) = updateSession { s -> s.copy(arrangement = s.arrangement.moved(slot, delta)) }
 
     fun include(uuid: String) = updateSession { s ->
         if (uuid in s.arrangement) s else s.copy(arrangement = s.arrangement + uuid)
