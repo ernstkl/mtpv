@@ -117,7 +117,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
             dismissButton = {
                 Row {
                     TextButton(onClick = { showInfo = false; showAbout = true }) { Text("About") }
-                    TextButton(onClick = onLeaveRole) { Text("Change role") }
+                    TextButton(onClick = { showInfo = false; onLeaveRole() }) { Text("Device role") }
                 }
             },
         )

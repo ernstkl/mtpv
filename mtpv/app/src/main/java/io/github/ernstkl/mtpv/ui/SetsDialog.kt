@@ -41,7 +41,7 @@ fun SetsDialog(rt: ControllerRuntime, st: ControllerState, onChooseLibrary: () -
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (path.size > 1) TextButton(onClick = { rt.browse(path.dropLast(1)) }) { Text("↑", style = MaterialTheme.typography.titleLarge) }
-                Text(if (path.isEmpty()) "Sets" else Library.title(path.map { it.name }), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(if (path.isEmpty()) "Library" else Library.title(path.map { it.name }), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         },
         text = {

@@ -18,15 +18,16 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10
 
 1. Install on all tablets, all on the same Wi-Fi.
 2. First start: choose **Controller** on one tablet and **Secondary** on the others. The choice is
-   remembered, so later starts go straight into the role.
+   remembered, so later starts go straight into the role. **Device role** in the menu changes it; back
+   or Cancel keeps the current role running.
 3. Pair each secondary once: on the controller, tap the middle of the screen (or ☰ top left) to open
    the menu → **Screens** → under
    *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary (both show the same code).
    Paired secondaries are added to the right of the controller; **Screens** sets the order (the
    controller can be in any position) and lets you add a secondary by IP if mDNS is blocked.
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
-   Then **Open PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
-   For a song set, collect one PDF per song in a folder and tap **Open folder**: the PDFs follow each
+   Then **Open single PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
+   For a song set, collect one PDF per song in a folder and tap **Open folder as set**: the PDFs follow each
    other like one long PDF, in alphabetical order (numbers by value, so "2" comes before "10"). Opening
    the same folder again keeps its order; files added since go to the end, removed ones drop out.
    Files without pages are left out. Subfolders are not included. **Songs** lists the set: tap a song
@@ -34,7 +35,7 @@ Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10
    out (it stays in the list, so it can be ticked again). Order and ticks are kept for that folder.
    **Reload folder** picks up added or removed PDFs. The top of the menu shows the song on the leftmost screen.
    To keep many sets, put their folders below one **Library folder** (in the menu; folders in
-   folders are fine, such as Gigs / 2026 / May). **Sets…** browses it: a folder without subfolders
+   folders are fine, such as Gigs / 2026 / May). **Open set from library…** browses it: a folder without subfolders
    opens as a set at a tap, one with subfolders opens to show them (↑ goes back up), and *Show this
    folder as a set* opens the PDFs of the folder shown. The open set is marked. Folders starting with
    "." and folders without PDFs are not shown. A set keeps its order and ticks however it was opened.
@@ -57,7 +58,7 @@ Tool and finger switch are the same on all screens, like one big sheet of paper:
 one screen is picked on all of them. The stylus draws on every screen whatever the switch says. Notes belong to the PDF's content: a changed PDF starts without notes.
 
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
-On a secondary, long-press for its address and to change the role.
+On a secondary, long-press for its address and **Device role**.
 
 ## How it works
 

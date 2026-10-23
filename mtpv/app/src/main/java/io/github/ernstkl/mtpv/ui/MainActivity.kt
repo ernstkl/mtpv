@@ -9,6 +9,7 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -65,10 +66,19 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize()) {
                     val role by app.role.collectAsStateWithLifecycle()
-                    when (role) {
-                        Role.NONE -> RoleChooser(app.prefs, app::setRole)
-                        Role.CONTROLLER -> app.controller?.let { ControllerScreen(it) { app.setRole(Role.NONE) } }
-                        Role.SECONDARY -> app.secondary?.let { SecondaryScreen(it) { app.setRole(Role.NONE) } }
+                    // The role keeps running while another one is being chosen; back or Cancel keeps it.
+                    var choosing by remember { mutableStateOf(false) }
+                    if (role == Role.NONE || choosing) {
+                        RoleChooser(app.prefs, current = role, onCancel = { choosing = false }) {
+                            choosing = false
+                            if (it != role) app.setRole(it)
+                        }
+                    } else {
+                        when (role) {
+                            Role.CONTROLLER -> app.controller?.let { ControllerScreen(it) { choosing = true } }
+                            Role.SECONDARY -> app.secondary?.let { SecondaryScreen(it) { choosing = true } }
+                            Role.NONE -> Unit
+                        }
                     }
                 }
             }
@@ -166,9 +176,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** The first start, or Device role: [current] is the role still running, NONE on the first start. */
 @Composable
-private fun RoleChooser(prefs: Prefs, onChoose: (Role) -> Unit) {
+private fun RoleChooser(prefs: Prefs, current: Role, onCancel: () -> Unit, onChoose: (Role) -> Unit) {
     var showAbout by remember { mutableStateOf(!prefs.aboutShown) }
+    BackHandler(enabled = current != Role.NONE, onBack = onCancel)
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -192,6 +204,11 @@ private fun RoleChooser(prefs: Prefs, onChoose: (Role) -> Unit) {
         }
         Spacer(Modifier.height(16.dp))
         TextButton(onClick = { showAbout = true }) { Text("About / How it works") }
+        if (current != Role.NONE) {
+            TextButton(onClick = onCancel) {
+                Text("Cancel: stay " + if (current == Role.CONTROLLER) "controller" else "secondary")
+            }
+        }
     }
     if (showAbout) {
         AboutDialog {

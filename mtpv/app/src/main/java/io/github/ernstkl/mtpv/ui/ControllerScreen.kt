@@ -1,5 +1,6 @@
 package io.github.ernstkl.mtpv.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -89,6 +90,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     }
 
     // No edge swipe: it would clash with the pen and with page turns. Open by tap, close by swipe or tap outside.
+    BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
     ModalNavigationDrawer(
         drawerState = drawer,
         gesturesEnabled = drawer.isOpen,
@@ -99,21 +101,21 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                         Text(s.set?.name ?: "MTPV controller", style = MaterialTheme.typography.titleMedium, maxLines = 2)
                         Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
                     }
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    MenuItem("Sets…") { menu { showSets = true } }
                     s.set?.let { set ->
                         if (s.folder != null || set.songs.size > 1) {
                             val count = if (set.shownSongs == set.songs.size) "${set.songs.size}" else "${set.shownSongs}/${set.songs.size}"
                             MenuItem("Songs ($count)") { menu { showSongs = true } }
                         }
                     }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    MenuItem("Open set from library…") { menu { showSets = true } }
+                    MenuItem("Open folder as set") { menu { folderPicker.launch(null) } }
+                    MenuItem("Open single PDF") { menu { picker.launch(arrayOf("application/pdf")) } }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     MenuItem("Screens (${s.arrangement.size})") { menu { showScreens = true } }
+                    MenuItem("Device role", "Controller") { menu(onLeaveRole) }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    MenuItem("Open PDF") { menu { picker.launch(arrayOf("application/pdf")) } }
-                    MenuItem("Open folder") { menu { folderPicker.launch(null) } }
                     MenuItem("Library folder", st.library?.name ?: "Not chosen yet") { menu { libraryPicker.launch(null) } }
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    MenuItem("Change role") { menu(onLeaveRole) }
                     MenuItem("About") { menu { showAbout = true } }
                 }
             }
