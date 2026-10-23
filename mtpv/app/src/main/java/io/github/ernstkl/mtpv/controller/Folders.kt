@@ -7,6 +7,8 @@ import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import io.github.ernstkl.mtpv.core.FolderFile
 import io.github.ernstkl.mtpv.core.Library
+import io.github.ernstkl.mtpv.core.LibraryEntry
+import io.github.ernstkl.mtpv.core.LibraryLevel
 import io.github.ernstkl.mtpv.core.SetRecord
 import io.github.ernstkl.mtpv.core.StoredFile
 import org.json.JSONArray
@@ -56,6 +58,42 @@ class Folders(private val context: Context) {
             }
         } ?: throw IOException("cannot read the folder")
         return files
+    }
+
+    /**
+     * What the Sets dialog shows of [folder]: its PDFs and, for each subfolder, how many PDFs and
+     * subfolders that holds. One query per subfolder, nothing deeper.
+     */
+    fun children(folder: Uri): LibraryLevel {
+        val kids = list(folder) ?: throw IOException("cannot read the folder")
+        val entries = kids.filter { it.isDir && !Library.isHidden(it.name) }.map { d ->
+            val inner = list(DocumentsContract.buildDocumentUriUsingTree(folder, d.id)).orEmpty()
+            LibraryEntry(d.name, d.id, inner.count { it.isPdf }, inner.count { it.isDir && !Library.isHidden(it.name) })
+        }
+        return LibraryLevel(kids.count { it.isPdf }, Library.visible(entries))
+    }
+
+    /** Document IDs from the top of [tree] down to [documentId], or null if the provider cannot tell. */
+    fun pathTo(tree: Uri, documentId: String): List<String>? = runCatching {
+        DocumentsContract.findDocumentPath(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, documentId))?.path
+    }.getOrNull()
+
+    private class Child(val id: String, val name: String, val mime: String?) {
+        val isDir get() = mime == Document.MIME_TYPE_DIR
+        val isPdf get() = !isDir && Library.isPdf(name, mime)
+    }
+
+    private fun list(folder: Uri): List<Child>? {
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(folder, DocumentsContract.getDocumentId(folder))
+        val columns = arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE)
+        return resolver.query(children, columns, null, null, null)?.use { c ->
+            val kids = mutableListOf<Child>()
+            while (c.moveToNext()) {
+                val name = c.getString(1) ?: continue
+                kids += Child(c.getString(0), name, c.getString(2))
+            }
+            kids
+        }
     }
 
     fun open(folder: Uri, f: FolderFile): InputStream =

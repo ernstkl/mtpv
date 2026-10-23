@@ -1,6 +1,7 @@
 package io.github.ernstkl.mtpv.controller
 
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import io.github.ernstkl.mtpv.ControllerSession
 import io.github.ernstkl.mtpv.FrontNotification
@@ -8,6 +9,8 @@ import io.github.ernstkl.mtpv.KnownSecondary
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.controllerSupported
 import io.github.ernstkl.mtpv.core.FolderFile
+import io.github.ernstkl.mtpv.core.LibraryEntry
+import io.github.ernstkl.mtpv.core.LibraryLevel
 import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.NotesStore
@@ -41,6 +44,20 @@ import java.io.IOException
 /** A pairing in progress: [code] is shown here and on the secondary, where someone taps Allow. */
 data class PairingUi(val uuid: String, val name: String, val code: String?)
 
+/**
+ * The library as the Sets dialog shows it. [path] runs from the library folder down to the folder
+ * shown; [level] is null while it is read or if it cannot be read ([error]). [openPath] holds the
+ * document IDs of the open set's folder and the folders above it, to mark the way there.
+ */
+data class LibraryUi(
+    val path: List<LibraryEntry>,
+    val level: LibraryLevel? = null,
+    val error: String? = null,
+    val openPath: Set<String> = emptySet(),
+) {
+    val name get() = path.firstOrNull()?.name
+}
+
 data class ControllerState(
     val session: ControllerSession,
     val links: Map<String, LinkStatus> = emptyMap(),
@@ -51,6 +68,8 @@ data class ControllerState(
     /** Secondaries found on the network that are not paired with this controller. */
     val nearby: Map<String, KnownSecondary> = emptyMap(),
     val pairing: PairingUi? = null,
+    /** Null until a library folder is chosen. */
+    val library: LibraryUi? = null,
     val busy: String? = null,
     val message: String? = null,
 ) {
@@ -93,7 +112,9 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private val links = mutableMapOf<String, Pair<SecondaryLink, Job>>()
     private var discovery: Discovery? = null
 
-    private val _state = MutableStateFlow(ControllerState(restoreSession(), tools = prefs.tools))
+    private val _state = MutableStateFlow(ControllerState(
+            restoreSession(), tools = prefs.tools, library = prefs.library?.let { LibraryUi(prefs.libraryPath) },
+        ))
     val state: StateFlow<ControllerState> = _state
 
     private fun restoreSession(): ControllerSession {
@@ -202,6 +223,67 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     fun reloadFolder() {
         _state.value.session.folder?.let { openFolder(Folders.folderOf(Uri.parse(it))) }
+    }
+
+    // --- library ---
+
+    private var browseJob: Job? = null
+
+    /** A library folder picked with the system's folder picker; the Sets dialog starts at its top. */
+    fun setLibrary(tree: Uri) {
+        try {
+            folders.keepAccess(tree)
+        } catch (e: SecurityException) {
+            showMessage("Could not keep access to the folder: ${e.message}")
+        }
+        prefs.library = tree.toString()
+        browse(emptyList())
+    }
+
+    /**
+     * Reads the library folder at [path] for the Sets dialog; null reads again where the dialog was
+     * left, an empty path the library folder itself. A folder that is gone falls back to the top.
+     */
+    fun browse(path: List<LibraryEntry>? = null) {
+        val tree = prefs.library?.let(Uri::parse) ?: return
+        val want = path ?: _state.value.library?.path.orEmpty()
+        browseJob?.cancel()
+        browseJob = scope.launch {
+            _state.update { it.copy(library = LibraryUi(want)) }
+            val ui = try {
+                readLibrary(tree, want)
+            } catch (e: Exception) {
+                try {
+                    readLibrary(tree, emptyList())
+                } catch (e: Exception) {
+                    LibraryUi(want, error = "Cannot read the library folder (${e.message}).")
+                }
+            }
+            if (ui.error == null) prefs.libraryPath = ui.path
+            _state.update { it.copy(library = ui) }
+        }
+    }
+
+    /** Opens [entry], one of the folders of the library, as a set. */
+    fun openLibrarySet(entry: LibraryEntry) {
+        val tree = prefs.library?.let(Uri::parse) ?: return
+        openFolder(DocumentsContract.buildDocumentUriUsingTree(tree, entry.documentId))
+    }
+
+    private fun readLibrary(tree: Uri, path: List<LibraryEntry>): LibraryUi {
+        val top = Folders.folderOf(tree)
+        val topId = DocumentsContract.getDocumentId(top)
+        val full = if (path.firstOrNull()?.documentId == topId) path else listOf(LibraryEntry(folders.name(top), topId))
+        val level = folders.children(DocumentsContract.buildDocumentUriUsingTree(tree, full.last().documentId))
+        return LibraryUi(full, level, openPath = openPath(tree))
+    }
+
+    /** The open set's folder and, if the provider can tell, the library folders above it. */
+    private fun openPath(tree: Uri): Set<String> {
+        val open = _state.value.session.folder?.let { Folders.folderOf(Uri.parse(it)) } ?: return emptySet()
+        if (open.authority != tree.authority) return emptySet()
+        val id = DocumentsContract.getDocumentId(open)
+        return folders.pathTo(tree, id)?.toSet() ?: setOf(id)
     }
 
     // --- songs ---

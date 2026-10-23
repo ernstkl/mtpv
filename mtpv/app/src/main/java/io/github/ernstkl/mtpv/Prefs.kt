@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import androidx.annotation.ChecksSdkIntAtLeast
+import io.github.ernstkl.mtpv.core.LibraryEntry
 import io.github.ernstkl.mtpv.core.Paging
 import io.github.ernstkl.mtpv.core.Song
 import io.github.ernstkl.mtpv.core.SongSet
@@ -65,6 +66,24 @@ class Prefs(private val context: Context) {
     var tools: ToolState
         get() = sp.getString("tools", null)?.let { runCatching { ToolSync.fromJson(JSONObject(it)) }.getOrNull() } ?: ToolState()
         set(value) = sp.edit().putString("tools", ToolSync.toJson(value).toString()).apply()
+
+    /** The library folder: the tree URI picked under Library folder, null until one is chosen. */
+    var library: String?
+        get() = sp.getString("library", null)
+        set(value) = sp.edit().putString("library", value).remove("libraryPath").apply()
+
+    /** Where the Sets dialog was left: the folders from the library folder down (names and document IDs). */
+    var libraryPath: List<LibraryEntry>
+        get() = sp.getString("libraryPath", null)?.let { s ->
+            runCatching {
+                JSONArray(s).let { a -> List(a.length()) { a.getJSONObject(it) }.map { LibraryEntry(it.getString("name"), it.getString("id")) } }
+            }.getOrNull()
+        }.orEmpty()
+        set(value) {
+            val a = JSONArray()
+            value.forEach { a.put(JSONObject().put("name", it.name).put("id", it.documentId)) }
+            sp.edit().putString("libraryPath", a.toString()).apply()
+        }
 
     var lastVersion: Long
         get() = sp.getLong("lastVersion", 0)

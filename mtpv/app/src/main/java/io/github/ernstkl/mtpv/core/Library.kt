@@ -6,6 +6,9 @@ package io.github.ernstkl.mtpv.core
  */
 data class LibraryEntry(val name: String, val documentId: String, val pdfs: Int = 0, val folders: Int = 0)
 
+/** One folder of the library: how many PDFs it holds itself, and its subfolders worth showing. */
+data class LibraryLevel(val pdfs: Int, val folders: List<LibraryEntry>)
+
 /** What tapping a folder in the Sets dialog does. */
 enum class LibraryTap { OPEN_AS_SET, BROWSE_INTO }
 
