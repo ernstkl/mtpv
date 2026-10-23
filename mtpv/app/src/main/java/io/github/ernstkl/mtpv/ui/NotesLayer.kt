@@ -162,7 +162,7 @@ private fun DrawScope.drawNote(tool: Tool, color: Int, width: Float, points: Flo
 
 /**
  * Tool bar: the square finger switch turns finger drawing on (green) and off (grey, crossed out);
- * then pen colours, marker and eraser, the selected one underlined, each picked with one tap; last
+ * then pen colours (a small dot on white), marker and eraser, the selected one underlined, each picked with one tap; last
  * the undo button, which removes the page's last stroke, whoever drew it; dimmed on an empty page.
  */
 @Composable
@@ -208,10 +208,12 @@ fun NoteToolPicker(
                 Box(
                     Modifier
                         .size(28.dp)
-                        .background(Color(t.color), CircleShape)
+                        // A pen is a small dot of its colour on white, so it looks thinner than the marker.
+                        .background(if (t.tool == Tool.PEN) Color.White else Color(t.color), CircleShape)
                         .border(1.dp, Color.White, CircleShape)
                         .drawWithContent {
                             drawContent()
+                            if (t.tool == Tool.PEN) drawCircle(Color(t.color), radius = size.minDimension / 4)
                             if (t == NoteTool.ERASER) drawEraser()
                         }
                         .clickable { onTool(t) },
