@@ -33,10 +33,10 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Text("4. Tap the right or left third of any screen, or use a Bluetooth pedal: " +
                     "every screen moves on by one page, until the last page is on the leftmost screen.")
                 Spacer(Modifier.height(12.dp))
-                Text("Song sets: put one PDF per song in a folder and tap Open folder as set. The songs follow each other " +
-                    "in alphabetical order, like one long PDF. Under Songs, tap a song to jump to it, drag ≡ to change the order, untick a song to leave it out.")
-                Text("Many sets: put their folders below one Library folder, then pick a set under Open set from library…. " +
-                    "A folder with subfolders opens to show them; ↑ goes back up.")
+                Text("Song sets: put one PDF per song in a folder, the set folders below one Library folder, " +
+                    "then pick a set under Open set from library…. A folder with subfolders opens to show them; ↑ goes back up.")
+                Text("The songs follow each other in alphabetical order, like one long PDF. " +
+                    "Under Songs, tap a song to jump to it, drag ≡ to change the order, untick a song to leave it out.")
                 Text("Controller: tap the middle or ☰ for the menu. Secondary: tap the middle or ☰ for its address and settings. " +
                     "If a secondary isn't found, enter its address under Screens.")
                 Text("Notes: draw with a stylus; pick pen, marker or eraser in the bar at the bottom left, ↶ undoes. " +

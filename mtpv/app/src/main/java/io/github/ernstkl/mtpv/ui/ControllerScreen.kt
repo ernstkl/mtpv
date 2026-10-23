@@ -59,6 +59,9 @@ private val Online = Color(0xFF2E7D32)
 private val Busy = Color(0xFFF9A825)
 private val Offline = Color(0xFFC62828)
 
+/** "Open folder as set" is hidden for now: next to "Open set from library…" it puzzles new users. */
+private const val OPEN_FOLDER_ITEM = false
+
 /**
  * The controller's own page. Tap the left third to go back, the right third to go forward,
  * the middle (or ☰) to open the menu drawer. Pedal keys are handled in MainActivity.
@@ -109,7 +112,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     MenuItem("Open set from library…") { menu { showSets = true } }
-                    MenuItem("Open folder as set") { menu { folderPicker.launch(null) } }
+                    if (OPEN_FOLDER_ITEM) MenuItem("Open folder as set") { menu { folderPicker.launch(null) } }
                     MenuItem("Open single PDF") { menu { picker.launch(arrayOf("application/pdf")) } }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     MenuItem("Screens (${s.arrangement.size})") { menu { showScreens = true } }

@@ -28,15 +28,15 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    controller can be in any position) and lets you add a secondary by IP if mDNS is blocked.
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
    Then **Open single PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
-   For a song set, collect one PDF per song in a folder and tap **Open folder as set**: the PDFs follow each
+   For a song set, collect one PDF per song in a folder below the **Library folder** (in the menu; folders in
+   folders are fine, such as Gigs / 2026 / May) and pick it under **Open set from library…**: the PDFs follow each
    other like one long PDF, in alphabetical order (numbers by value, so "2" comes before "10"). Opening
    the same folder again keeps its order; files added since go to the end, removed ones drop out.
    Files without pages are left out. Subfolders are not included. **Songs** lists the set: tap a song
    to show it from the leftmost screen, drag ≡ to change the order, untick a song to leave its pages
    out (it stays in the list, so it can be ticked again). Order and ticks are kept for that folder.
    **Reload folder** picks up added or removed PDFs. The top of the menu shows the song on the leftmost screen.
-   To keep many sets, put their folders below one **Library folder** (in the menu; folders in
-   folders are fine, such as Gigs / 2026 / May). **Open set from library…** browses it: a folder without subfolders
+   **Open set from library…** browses the library: a folder without subfolders
    opens as a set at a tap, one with subfolders opens to show them (↑ goes back up), and *Show this
    folder as a set* opens the PDFs of the folder shown. The open set is marked. Folders starting with
    "." and folders without PDFs are not shown. A set keeps its order and ticks however it was opened.
