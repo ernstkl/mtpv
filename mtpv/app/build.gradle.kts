@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -16,8 +18,22 @@ android {
         versionName = "0.1.0"
     }
 
+    // Signs release builds for testers when keystore.properties exists (kept out of git).
+    // Without it the release APK stays unsigned, as F-Droid wants it.
+    val keystoreProperties = rootProject.file("keystore.properties")
+    val releaseSigning = if (keystoreProperties.exists()) {
+        val props = Properties().apply { keystoreProperties.inputStream().use { load(it) } }
+        signingConfigs.create("release") {
+            storeFile = file(props.getProperty("storeFile"))
+            storePassword = props.getProperty("storePassword")
+            keyAlias = props.getProperty("keyAlias")
+            keyPassword = props.getProperty("keyPassword")
+        }
+    } else null
+
     buildTypes {
         release {
+            signingConfig = releaseSigning
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

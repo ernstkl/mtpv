@@ -12,6 +12,20 @@ Architecture overview: [`../CONCEPT.md`](../CONCEPT.md).
     ./gradlew testDebugUnitTest
     adb install -r app/build/outputs/apk/debug/app-debug.apk
 
+For testers, use a signed release build: it is much smaller and faster than the debug build. Create a
+key once and keep it safe (updates must be signed with the same key), then put its details into
+`keystore.properties` next to `settings.gradle.kts` (ignored by git):
+
+    keytool -genkey -v -keystore ~/mtpv-release.jks -alias mtpv -keyalg RSA -keysize 4096 -validity 10000
+
+    storeFile=/home/<you>/mtpv-release.jks
+    storePassword=…
+    keyAlias=mtpv
+    keyPassword=…
+
+`./gradlew assembleRelease` then writes `app/build/outputs/apk/release/app-release.apk`. Without
+`keystore.properties` it writes `app-release-unsigned.apk`, which F-Droid signs itself.
+
 Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10+ (minSdk 29), for both roles. Discovery watches addresses with `registerServiceInfoCallback`
 on Android 14+; older controllers resolve once and resolve again when a secondary stops answering.
 
