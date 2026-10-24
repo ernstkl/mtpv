@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.Stroke as StrokeStyle
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -52,6 +53,8 @@ import io.github.ernstkl.mtpv.core.NotesGeometry
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.Tool
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.random.Random
 
 /**
@@ -259,23 +262,51 @@ fun NoteToolPicker(
 @Composable
 private fun Separator() = Box(Modifier.size(width = 1.dp, height = 24.dp).background(Color.Gray))
 
-/** A finger from the top right, the hand cut off by the corner, writing a wavy line from its tip. */
+/**
+ * A finger from the top right, the hand cut off by the corner, writing a wavy line from its tip.
+ * Finger and line are turned [FINGER_TURN] degrees apart (the finger counterclockwise about the top
+ * right corner, the line clockwise about the bottom right one), so they do not form one straight diagonal.
+ */
 private fun DrawScope.drawFingerWriting() {
     val w = size.width
     val h = size.height
     fun at(x: Float, y: Float) = Offset(x * w, y * h)
-    drawLine(Color.White, at(0.48f, 0.56f), at(0.80f, 0.12f), strokeWidth = 0.18f * w, cap = StrokeCap.Round)
-    drawCircle(Color.White, radius = 0.20f * w, center = at(0.92f, 0.10f))
-    // Knuckle crease and nail.
-    drawLine(Color(0xFF9E9E9E), at(0.62f, 0.38f), at(0.69f, 0.43f), strokeWidth = 0.025f * w, cap = StrokeCap.Round)
-    drawLine(Color(0xFF9E9E9E), at(0.495f, 0.59f), at(0.545f, 0.52f), strokeWidth = 0.08f * w, cap = StrokeCap.Round)
+    val fingerPivot = at(1f, 0f)
+    val linePivot = at(1f, 1f)
+    rotate(-FINGER_TURN / 2, fingerPivot) {
+        drawLine(Color.White, at(0.48f, 0.56f), at(0.80f, 0.12f), strokeWidth = 0.18f * w, cap = StrokeCap.Round)
+        drawCircle(Color.White, radius = 0.20f * w, center = at(0.92f, 0.10f))
+        // Knuckle crease and nail.
+        drawLine(Color(0xFF9E9E9E), at(0.62f, 0.38f), at(0.69f, 0.43f), strokeWidth = 0.025f * w, cap = StrokeCap.Round)
+        drawLine(Color(0xFF9E9E9E), at(0.495f, 0.59f), at(0.545f, 0.52f), strokeWidth = 0.08f * w, cap = StrokeCap.Round)
+    }
     val line = Path().apply {
         moveTo(0.42f * w, 0.66f * h)
         cubicTo(0.36f * w, 0.78f * h, 0.30f * w, 0.58f * h, 0.24f * w, 0.70f * h)
         cubicTo(0.19f * w, 0.80f * h, 0.30f * w, 0.84f * h, 0.22f * w, 0.88f * h)
         cubicTo(0.16f * w, 0.91f * h, 0.12f * w, 0.82f * h, 0.08f * w, 0.90f * h)
     }
-    drawPath(line, Color.White, style = StrokeStyle(width = 0.05f * w, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    // Turned about different corners, tip and line start drift apart; move the line back to the tip.
+    val tip = at(0.48f, 0.56f)
+    val start = at(0.42f, 0.66f)
+    val shift = turned(tip, -FINGER_TURN / 2, fingerPivot) - turned(start, FINGER_TURN / 2, linePivot) - (tip - start)
+    translate(shift.x, shift.y) {
+        rotate(FINGER_TURN / 2, linePivot) {
+            drawPath(line, Color.White, style = StrokeStyle(width = 0.05f * w, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+private const val FINGER_TURN = 14f
+
+/** [p] turned [degrees] clockwise about [pivot], as [rotate] draws it. */
+private fun turned(p: Offset, degrees: Float, pivot: Offset): Offset {
+    val r = Math.toRadians(degrees.toDouble())
+    val d = p - pivot
+    return pivot + Offset(
+        (d.x * cos(r) - d.y * sin(r)).toFloat(),
+        (d.x * sin(r) + d.y * cos(r)).toFloat(),
+    )
 }
 
 /** A tilted rubber: pink tip on the left, blue sleeve on the right. */
