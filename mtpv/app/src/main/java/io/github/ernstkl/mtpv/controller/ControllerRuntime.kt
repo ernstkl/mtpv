@@ -12,19 +12,24 @@ import io.github.ernstkl.mtpv.core.LibraryEntry
 import io.github.ernstkl.mtpv.core.LibraryLevel
 import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.ToolState
+import io.github.ernstkl.mtpv.core.NotesKey
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.PageRenderer
 import io.github.ernstkl.mtpv.core.Paging
+import io.github.ernstkl.mtpv.core.SetAdoption
 import io.github.ernstkl.mtpv.core.SetOrder
 import io.github.ernstkl.mtpv.core.SetRecord
 import io.github.ernstkl.mtpv.core.Song
+import io.github.ernstkl.mtpv.core.SongReconcile
 import io.github.ernstkl.mtpv.core.SongSet
 import io.github.ernstkl.mtpv.core.StoredFile
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.moved
 import io.github.ernstkl.mtpv.net.Endpoint
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,6 +67,15 @@ data class LibraryUi(
     val showsOpenSet get() = openPath.isNotEmpty() && path.lastOrNull()?.documentId == openPath.last()
 }
 
+/** Notes of another song that new song [name] can start with: song [file] of set [set], last changed at [changed]. */
+data class NotesOffer(val name: String, val set: String, val file: String, val notesKey: String, val changed: Long)
+
+/**
+ * New songs of set [set] whose PDF has notes elsewhere. [answer] gets the names of the songs that
+ * start with a copy of those notes, or null to not open the set after all.
+ */
+data class NotesOfferUi(val set: String, val offers: List<NotesOffer>, val answer: CompletableDeferred<Set<String>?>)
+
 data class ControllerState(
     val session: ControllerSession,
     val links: Map<String, LinkStatus> = emptyMap(),
@@ -74,6 +88,7 @@ data class ControllerState(
     val pairing: PairingUi? = null,
     /** Null until a library folder is chosen. */
     val library: LibraryUi? = null,
+    val notesOffer: NotesOfferUi? = null,
     val busy: String? = null,
     val message: String? = null,
 ) {
@@ -85,13 +100,13 @@ data class ControllerState(
     fun pageForSlot(slot: Int) = Paging.pageFor(session.start, slot, totalPages)
 
     /**
-     * File and page within it for [slot]. A blank screen past the end gets the last shown song's
-     * file with page 0, so it shows the empty-set sign. Null while no set is open.
+     * Song page for [slot]. A blank screen past the end gets the last shown song's file with page 0,
+     * so it shows the empty-set sign. Null while no set is open.
      */
     fun targetForSlot(slot: Int): Target? {
         val set = session.set ?: return null
         val last = set.songs.lastOrNull { !it.excluded } ?: set.songs.last()
-        return set.locate(pageForSlot(slot))?.let { Target(it.fileId, it.page) } ?: Target(last.fileId, 0)
+        return set.locate(pageForSlot(slot))?.let { Target(it.fileId, it.notesKey, it.page) } ?: Target(last.fileId, null, 0)
     }
 
     /** Secondary that still holds unsaved notes of [key] and can be reached, if any. */
@@ -132,7 +147,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun start() {
         discovery = Discovery(app, ::onFound).also { it.start() }
         syncLinks()
-        if (_state.value.session.set == null) reloadFolder()
+        if (_state.value.session.set == null) reloadFolder() else relocateFolder()
     }
 
     fun stop() {
@@ -154,21 +169,30 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     // --- file ---
 
-    /** A single PDF becomes a set of one song. */
+    /** Reading a folder or PDF; a new one cancels it. */
+    private var openJob: Job? = null
+
+    /** A single PDF becomes a set of one song, with a record of its own keyed by the document. */
     fun openPdf(uri: Uri) {
-        scope.launch {
+        openJob?.cancel()
+        openJob = scope.launch {
             _state.update { it.copy(busy = "Loading PDF…") }
             try {
                 val id = app.contentResolver.openInputStream(uri)?.use { cache.store(it) }
                     ?: error("cannot read file")
                 val name = displayName(uri)
                 val count = app.renderers.get(id)?.pageCount ?: error("not a readable PDF")
-                val set = SongSet.of(name, listOf(Song(name, id, count)))
-                if (set.songs.isEmpty()) error("the PDF has no pages")
+                if (count == 0) error("the PDF has no pages")
+                val stored = StoredFile(FolderFile(name, uri.toString(), -1, 0), id, count)
+                val record = updateRecord(uri, name, folders.load(uri), listOf(stored), mapOf(name to id), path = null)
+                    ?: return@launch
+                val set = SongSet.of(name, listOf(Song(name, id, record.notesKey(name)!!, count)))
                 withContext(Dispatchers.Main) {
                     updateSession { it.copy(set = set, folder = null, start = 1) }
                 }
                 cache.evict(setOf(id))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 showMessage("Could not open PDF: ${e.message}")
             } finally {
@@ -190,45 +214,161 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     /**
      * The PDFs in [folder] (a document URI) become a set, in the order stored for that folder:
      * files still there keep their places, new ones go to the end. Files that are no readable PDF
-     * or have no pages are left out quietly.
+     * or have no pages are left out quietly. [path] holds the folder names from the library folder
+     * down, if the folder was picked there; a folder that cannot be read is then looked for at the
+     * same place in the library folder, in case the library moved.
      */
-    fun openFolder(folder: Uri) {
-        scope.launch {
+    fun openFolder(folder: Uri, path: List<String>? = null) {
+        openJob?.cancel()
+        openJob = scope.launch {
             _state.update { it.copy(busy = "Reading folder…") }
             try {
-                val name = folders.name(folder)
-                val present = folders.pdfs(folder).associateBy { it.name }
-                val old = folders.load(folder)
-                val order = SetOrder.merge(old?.order.orEmpty(), present.keys)
-                val stored = order.mapIndexedNotNull { i, n ->
-                    _state.update { it.copy(busy = "Loading ${i + 1} of ${order.size}…") }
-                    val f = present.getValue(n)
-                    old?.unchanged(f)?.takeIf { it.pageCount == 0 || cache.has(it.fileId) } ?: copy(folder, f)
+                val files = try {
+                    folders.pdfs(folder)
+                } catch (e: Exception) {
+                    val (moved, p) = movedFolder(folder, path) ?: throw e
+                    readFolder(moved, folders.pdfs(moved), p)
+                    return@launch
                 }
-                val excluded = old?.excluded.orEmpty() intersect present.keys
-                folders.save(folder, SetRecord(folder.toString(), name, order, stored, excluded))
-                val set = SongSet.of(name, stored.map { Song(it.file.name, it.fileId, it.pageCount, it.file.name in excluded) })
-                if (set.songs.isEmpty()) error("no PDFs in $name")
-                withContext(Dispatchers.Main) {
-                    updateSession { s ->
-                        // Reading the same folder again keeps the page on the first screen, if it is still there.
-                        val first = when {
-                            s.folder != folder.toString() -> 1
-                            // Restored without its set: keep the page number.
-                            s.set == null -> s.start
-                            else -> s.set.locate(s.start)?.let(set::pageOf) ?: 1
-                        }
-                        s.copy(set = set, folder = folder.toString(), start = first.coerceAtLeast(1))
-                    }
-                }
-                cache.evict(set.songs.map { it.fileId }.toSet())
-                releaseUnusedFolders()
+                readFolder(folder, files, path)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 showMessage("Could not open the folder: ${e.message}")
             } finally {
                 _state.update { it.copy(busy = null) }
             }
         }
+    }
+
+    /**
+     * For a [folder] that cannot be read: the folder at its place in the library folder, and that
+     * place ([path], or the one its record keeps). Null if there is none.
+     */
+    private fun movedFolder(folder: Uri, path: List<String>?): Pair<Uri, List<String>>? {
+        val p = path ?: folders.load(folder)?.path ?: return null
+        val tree = prefs.library?.let(Uri::parse) ?: return null
+        val moved = runCatching { folders.find(tree, p) }.getOrNull()?.takeIf { it != folder } ?: return null
+        return moved to p
+    }
+
+    /** At start: if the open set's folder cannot be read any more but the library has one at its place, open that. */
+    private fun relocateFolder() {
+        val folder = _state.value.session.folder?.let(Uri::parse) ?: return
+        scope.launch {
+            if (runCatching { folders.pdfs(folder) }.isSuccess) return@launch
+            val (moved, path) = movedFolder(folder, null) ?: return@launch
+            withContext(Dispatchers.Main) { openFolder(moved, path) }
+        }
+    }
+
+    private suspend fun readFolder(folder: Uri, files: List<FolderFile>, path: List<String>?) {
+        val name = folders.name(folder)
+        val present = files.associateBy { it.name }
+        // A folder without a record may be a set whose library moved.
+        val old = folders.load(folder)
+            ?: path?.let { p -> SetAdoption.pick(folders.all().filter { it.folder != folder.toString() }, p, present.keys) }
+        val names = SetOrder.merge(old?.order.orEmpty(), present.keys)
+        val stored = names.mapIndexedNotNull { i, n ->
+            _state.update { it.copy(busy = "Loading ${i + 1} of ${names.size}…") }
+            val f = present.getValue(n)
+            old?.unchanged(f)?.takeIf { it.pageCount == 0 || cache.has(it.fileId) } ?: copy(folder, f)
+        }
+        val hashes = present.keys.associateWith { n -> stored.firstOrNull { it.file.name == n }?.fileId }
+        val record = updateRecord(folder, name, old, stored, hashes, path) ?: return
+        val byName = stored.associateBy { it.file.name }
+        val set = SongSet.of(name, record.order.mapNotNull { n ->
+            val f = byName[n] ?: return@mapNotNull null
+            Song(n, f.fileId, record.notesKey(n) ?: return@mapNotNull null, f.pageCount, n in record.excluded)
+        })
+        if (set.songs.isEmpty()) error("no PDFs in $name")
+        withContext(Dispatchers.Main) {
+            updateSession { s ->
+                val first = when {
+                    // Restored without its set: keep the page number.
+                    s.set == null -> if (s.folder == folder.toString()) s.start else 1
+                    // The same set read again, also from where its library moved, keeps the page on
+                    // the first screen if its song is still there; another set has none of its songs.
+                    else -> s.set.locate(s.start)?.let { set.pageOf(it.key) } ?: 1
+                }
+                s.copy(set = set, folder = folder.toString(), start = first.coerceAtLeast(1))
+            }
+        }
+        cache.evict(set.songs.map { it.fileId }.toSet())
+        releaseUnusedFolders()
+    }
+
+    /**
+     * Brings the record of [folder] (or of a single PDF) up to date with the files read now
+     * ([hashes]: each listed file with its hash, null if it could not be read): songs follow
+     * renames, those whose file is gone or changed lose their notes, and new songs whose PDF has
+     * notes elsewhere may start with a copy of them, if the user wants. Null if the user
+     * cancelled; nothing is changed then.
+     */
+    private suspend fun updateRecord(
+        folder: Uri,
+        name: String,
+        old: SetRecord?,
+        stored: List<StoredFile>,
+        hashes: Map<String, String?>,
+        path: List<String>?,
+    ): SetRecord? {
+        val changes = SongReconcile.reconcile(
+            old?.songs.orEmpty(), old?.files.orEmpty().associate { it.file.name to it.file.documentId },
+            hashes, stored.associate { it.file.name to it.file.documentId }, NotesKey::newId,
+        )
+        fun renamed(n: String) = changes.renamed[n] ?: n
+        val record = SetRecord(
+            id = old?.id ?: NotesKey.newId(),
+            folder = folder.toString(),
+            name = name,
+            order = SetOrder.merge(old?.order.orEmpty().map(::renamed), hashes.keys),
+            files = stored,
+            excluded = old?.excluded.orEmpty().map(::renamed).toSet() intersect hashes.keys,
+            songs = changes.songs,
+            path = path ?: old?.path,
+        )
+        val offers = notesOffers(record, changes.added)
+        val take = if (offers.isEmpty()) emptySet() else askNotesOffer(name, offers) ?: return null
+        offers.filter { it.name in take }.forEach { notes.copy(it.notesKey, record.notesKey(it.name)!!) }
+        folders.save(folder, record)
+        if (old != null && old.folder != record.folder) folders.remove(old)
+        changes.removed.forEach { notes.delete(NotesKey.of(record.id, it)) }
+        return record
+    }
+
+    /**
+     * For each of the [added] songs of [record], the most recently changed notes of another song
+     * with the same PDF, in any set; songs whose PDF has no notes elsewhere are left out.
+     */
+    private fun notesOffers(record: SetRecord, added: List<String>): List<NotesOffer> {
+        if (added.isEmpty()) return emptyList()
+        val records = folders.all().filter { it.id != record.id } + record
+        return added.mapNotNull { n ->
+            val fileId = record.songs.getValue(n).fileId
+            records.flatMap { r ->
+                r.songs.filter { (other, e) -> e.fileId == fileId && !(r === record && other in added) }.mapNotNull { (other, _) ->
+                    val key = r.notesKey(other)!!
+                    notes.lastChanged(key)?.let { NotesOffer(n, r.name, other, key, it) }
+                }
+            }.maxByOrNull { it.changed }
+        }
+    }
+
+    /** Asks which of the [offers] to take, before the set is shown; null if the user cancels. */
+    private suspend fun askNotesOffer(set: String, offers: List<NotesOffer>): Set<String>? {
+        val answer = CompletableDeferred<Set<String>?>()
+        _state.update { it.copy(notesOffer = NotesOfferUi(set, offers, answer), busy = null) }
+        try {
+            return answer.await()
+        } finally {
+            _state.update { if (it.notesOffer?.answer === answer) it.copy(notesOffer = null) else it }
+        }
+    }
+
+    /** The answer to the notes offer: the songs that start with a copy, or null to cancel. */
+    fun answerNotesOffer(take: Set<String>?) {
+        _state.value.notesOffer?.answer?.complete(take)
     }
 
     fun reloadFolder() {
@@ -284,10 +424,13 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         }
     }
 
-    /** Opens [entry], one of the folders of the library, as a set. */
+    /** Opens [entry], one of the folders of the library (the one shown, or one in it), as a set. */
     fun openLibrarySet(entry: LibraryEntry) {
         val tree = prefs.library?.let(Uri::parse) ?: return
-        openFolder(DocumentsContract.buildDocumentUriUsingTree(tree, entry.documentId))
+        val shown = _state.value.library?.path.orEmpty()
+        val path = if (shown.lastOrNull()?.documentId == entry.documentId) shown else shown + entry
+        // Names below the library folder: the library may move, its name may change.
+        openFolder(DocumentsContract.buildDocumentUriUsingTree(tree, entry.documentId), path.drop(1).map { it.name })
     }
 
     private fun readLibrary(tree: Uri, path: List<LibraryEntry>): LibraryUi {
@@ -328,7 +471,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             val set = s.set ?: return@updateSession s
             val changed = f(set)
             val self = s.arrangement.indexOf(Paging.SELF)
-            val start = set.locate(s.start + self)?.let { changed.pageOf(it) }?.takeIf { it > 0 }?.let { it - self } ?: s.start
+            val start = set.locate(s.start + self)?.let { changed.pageOf(it.key) }?.takeIf { it > 0 }?.let { it - self } ?: s.start
             s.copy(set = changed, start = start)
         }
         val s = _state.value.session
@@ -471,7 +614,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     override fun load(key: PageKey): NotesStore.Page = notes.load(key)
 
     override fun saveFromSecondary(uuid: String, notes: SecondaryClient.Notes) {
-        val key = PageKey(notes.fileId ?: return, notes.page)
+        val key = PageKey(notes.notesKey?.takeIf(NotesKey::isValid) ?: return, notes.page)
         if (this.notes.saveFromSecondary(key, notes.strokes, notes.baseRev)) {
             val name = _state.value.session.known[uuid]?.name ?: uuid.take(4)
             showMessage("Page ${key.page} was written on here and on $name. Both sets of notes are kept.")

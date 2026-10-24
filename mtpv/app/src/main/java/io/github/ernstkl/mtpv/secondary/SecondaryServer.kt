@@ -63,6 +63,7 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
                     controller = controller,
                     version = body.getLong("version"),
                     fileId = body.optString("fileId").ifEmpty { null },
+                    notesKey = body.optString("notesKey").ifEmpty { null },
                     page = body.optInt("page"),
                     notes = NotesJson.fromJson(body.optJSONArray("notes")),
                     notesRev = body.optLong("notesRev"),

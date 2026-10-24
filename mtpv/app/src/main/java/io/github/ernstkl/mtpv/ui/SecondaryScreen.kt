@@ -69,17 +69,17 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
             ),
     ) {
         PageView(display.fileId, display.page, rt::render, dark = tools.dark) { fileId, page ->
-            if (notes.fileId == fileId && notes.page == page) {
+            val notesKey = notes.notesKey
+            if (notes.fileId == fileId && notes.page == page && notesKey != null) {
                 NotesLayer(
-                    PageKey(fileId, page), notes.strokes, tools.tool, enabled = true,
+                    PageKey(notesKey, page), notes.strokes, tools.tool, enabled = true,
                     onChange = rt::editNotes, onPen = rt::setPenDown, fingers = tools.fingers, dark = tools.dark,
                 )
             }
         }
-        val shownFile = display.fileId
-        if (shownFile != null && display.page > 0) {
-            val key = PageKey(shownFile, display.page)
-            val shown = notes.fileId == key.fileId && notes.page == key.page
+        if (display.fileId != null && display.page > 0) {
+            val shown = notes.fileId == display.fileId && notes.page == display.page && notes.notesKey != null
+            val key = PageKey(notes.notesKey.orEmpty(), display.page)
             NoteToolPicker(
                 tools.tool, rt::pickTool, tools.fingers, rt::setFingers,
                 canUndo = shown && notes.strokes.isNotEmpty(),

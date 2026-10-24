@@ -134,14 +134,18 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
         ) {
             val own = st.ownTarget
             PageView(own?.fileId, own?.page ?: 0, rt::render, dark = st.tools.dark) { fileId, page ->
-                val key = PageKey(fileId, page)
-                val strokes = remember(key, changes) { rt.load(key).strokes }
-                // While a secondary still holds this page's latest notes, wait for them before drawing.
-                NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes,
-                    fingers = st.tools.fingers, dark = st.tools.dark)
+                // The notes of the song shown, once its page is drawn (two songs may share a PDF).
+                val notesKey = own?.notesKey?.takeIf { own.fileId == fileId && own.page == page }
+                if (notesKey != null) {
+                    val key = PageKey(notesKey, page)
+                    val strokes = remember(key, changes) { rt.load(key).strokes }
+                    // While a secondary still holds this page's latest notes, wait for them before drawing.
+                    NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes,
+                        fingers = st.tools.fingers, dark = st.tools.dark)
+                }
             }
-            if (own?.fileId != null && own.page > 0) {
-                val key = PageKey(own.fileId, own.page)
+            if (own?.notesKey != null && own.fileId != null && own.page > 0) {
+                val key = PageKey(own.notesKey, own.page)
                 val strokes = remember(key, changes) { rt.load(key).strokes }
                 NoteToolPicker(
                     st.tools.tool, rt::setTool, st.tools.fingers, rt::setFingers,
@@ -175,6 +179,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     if (showSets) SetsDialog(rt, st, onChooseLibrary = { libraryPicker.launch(null) }) { showSets = false }
     if (showSongs) SongsDialog(rt, st) { showSongs = false }
     if (showAbout) AboutDialog { showAbout = false }
+    st.notesOffer?.let { NotesOfferDialog(it, rt::answerNotesOffer) }
 
     st.pairing?.let { p ->
         AlertDialog(

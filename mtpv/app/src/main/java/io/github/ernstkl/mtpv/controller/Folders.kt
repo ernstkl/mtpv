@@ -9,7 +9,9 @@ import io.github.ernstkl.mtpv.core.FolderFile
 import io.github.ernstkl.mtpv.core.Library
 import io.github.ernstkl.mtpv.core.LibraryEntry
 import io.github.ernstkl.mtpv.core.LibraryLevel
+import io.github.ernstkl.mtpv.core.NotesKey
 import io.github.ernstkl.mtpv.core.SetRecord
+import io.github.ernstkl.mtpv.core.SongEntry
 import io.github.ernstkl.mtpv.core.StoredFile
 import org.json.JSONArray
 import org.json.JSONObject
@@ -22,7 +24,8 @@ import java.security.MessageDigest
  * Folders of PDFs, reached through the Storage Access Framework, and what the app remembers about
  * each of them in filesDir/sets/<key>.json. A folder is a document URI below a granted tree: the
  * picked folder itself, or one below the library folder. The key is the hash of the folder's
- * document ID, not of the URI, so the same folder is recognised however it was reached.
+ * document ID, not of the URI, so the same folder is recognised however it was reached. A single
+ * PDF opened without a folder has a record of its own, keyed by its document.
  */
 class Folders(private val context: Context) {
     private val dir = File(context.filesDir, "sets").apply { mkdirs() }
@@ -90,6 +93,16 @@ class Folders(private val context: Context) {
         DocumentsContract.findDocumentPath(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, documentId))?.path
     }.getOrNull()
 
+    /** The folder at [path], folder names from the top of [tree] down; null if there is none. */
+    fun find(tree: Uri, path: List<String>): Uri? {
+        var folder = folderOf(tree)
+        for (name in path) {
+            val child = list(folder)?.firstOrNull { it.isDir && it.name == name } ?: return null
+            folder = DocumentsContract.buildDocumentUriUsingTree(folder, child.id)
+        }
+        return folder
+    }
+
     private class Child(val id: String, val name: String, val mime: String?) {
         val isDir get() = mime == Document.MIME_TYPE_DIR
         val isPdf get() = !isDir && Library.isPdf(name, mime)
@@ -112,8 +125,18 @@ class Folders(private val context: Context) {
         resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(folder, f.documentId))
             ?: throw IOException("cannot read ${f.name}")
 
-    fun load(folder: Uri): SetRecord? {
-        val f = file(folder)
+    fun load(folder: Uri): SetRecord? = read(file(folder))
+
+    /** The records of all sets, to find a moved set or other copies of a song. */
+    fun all(): List<SetRecord> =
+        dir.listFiles { f -> f.isFile && f.name.endsWith(".json") }.orEmpty().mapNotNull(::read)
+
+    /** Forgets the record [r], after it moved to another folder. */
+    fun remove(r: SetRecord) {
+        file(Uri.parse(r.folder)).delete()
+    }
+
+    private fun read(f: File): SetRecord? {
         if (!f.isFile) return null
         return runCatching {
             val o = JSONObject(f.readText())
@@ -127,7 +150,14 @@ class Folders(private val context: Context) {
                 }
             }
             val excluded = o.optJSONArray("excluded")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty().toSet()
-            SetRecord(o.getString("folder"), o.getString("name"), order, files, excluded)
+            val songs = o.optJSONObject("songs")?.let { j ->
+                j.keys().asSequence().associateWith { n -> j.getJSONObject(n).let { SongEntry(it.getString("fileId"), it.getString("notesId")) } }
+            }.orEmpty()
+            val path = o.optJSONArray("path")?.let { a -> List(a.length()) { a.getString(it) } }
+            SetRecord(
+                o.optString("id").ifEmpty { NotesKey.newId() }, o.getString("folder"), o.getString("name"), order, files,
+                excluded, songs, path,
+            )
         }.getOrNull()
     }
 
@@ -139,17 +169,22 @@ class Folders(private val context: Context) {
                     .put("lastModified", it.file.lastModified).put("fileId", it.fileId).put("pageCount", it.pageCount)
             )
         }
-        val o = JSONObject().put("folder", r.folder).put("name", r.name).put("order", JSONArray(r.order)).put("files", files)
-            .put("excluded", JSONArray(r.excluded.toList()))
+        val songs = JSONObject()
+        r.songs.forEach { (n, e) -> songs.put(n, JSONObject().put("fileId", e.fileId).put("notesId", e.notesId)) }
+        val o = JSONObject().put("id", r.id).put("folder", r.folder).put("name", r.name).put("order", JSONArray(r.order))
+            .put("files", files).put("excluded", JSONArray(r.excluded.toList())).put("songs", songs)
             .put("lastOpened", System.currentTimeMillis())
+        r.path?.let { o.put("path", JSONArray(it)) }
         val f = file(folder)
         val tmp = File(dir, f.name + ".tmp")
         tmp.writeText(o.toString())
         tmp.renameTo(f)
     }
 
+    /** Keyed by the document ID; a single PDF from a provider without document IDs by its URI. */
     private fun file(folder: Uri): File {
-        val id = "${folder.authority}\n${DocumentsContract.getDocumentId(folder)}"
+        val doc = runCatching { DocumentsContract.getDocumentId(folder) }.getOrDefault(folder.toString())
+        val id = "${folder.authority}\n$doc"
         val key = MessageDigest.getInstance("SHA-256").digest(id.toByteArray()).joinToString("") { "%02x".format(it) }
         return File(dir, "$key.json")
     }

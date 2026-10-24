@@ -42,6 +42,9 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    opens as a set at a tap, one with subfolders opens to show them (↑ goes back up), and *Show this
    folder as a set* opens the PDFs of the folder shown. The open set is marked. Folders starting with
    "." and folders without PDFs are not shown. A set keeps its order and ticks however it was opened.
+   A renamed file keeps its place, tick and notes. If the library moves (say from the SD card to
+   internal storage), pick it again under **Library folder**: each set found at the same place in it
+   keeps its order, ticks and notes.
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
@@ -59,7 +62,11 @@ page's strokes one by one, newest first, whichever screen they were drawn on (er
 undone). Without a stylus, tap the square finger switch at the left of the bar (green = on): a
 finger then draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
 Tool and finger switch are the same on all screens, like one big sheet of paper: what you pick on
-one screen is picked on all of them. The stylus draws on every screen whatever the switch says. Notes belong to the PDF's content: a changed PDF starts without notes.
+one screen is picked on all of them. The stylus draws on every screen whatever the switch says.
+Notes belong to a song, a PDF in a set: a copy of the PDF in another set, or under another name in
+the same set, has notes of its own. Deleting a file from the folder, or changing its content, deletes
+its notes; renaming it keeps them. When a new song's PDF already has notes elsewhere, opening the set
+asks once whether it starts with a copy of them (the newest ones, with where they come from).
 
 Dark pages: **◐** at the top right of any screen swaps light and dark on all screens, so white paper turns black.
 Colours keep their hue (red notes stay red); the marker tints the black paper instead of the white.
@@ -80,11 +87,15 @@ On a secondary, tap the middle of the screen (or ☰ top left) for its address, 
 - A folder is read through the Storage Access Framework (read access only, kept across restarts; one
   grant for the library folder covers every folder below it). Its
   PDFs are copied into the cache; `filesDir/sets/<hash of the folder's document ID>.json` keeps the
-  song order and each file's size and date, so unchanged files are not read again. Secondaries only
-  ever see single files: the controller works out each screen's file and page.
+  song order and each file's size and date, so unchanged files are not read again, plus a random set
+  ID, each song's notes ID and the folder's path below the library folder. A folder without a record
+  takes over the one with the same path whose files are mostly there (the library moved). A single
+  PDF gets a record of its own, keyed by its document. Secondaries only ever see single files: the
+  controller works out each screen's file and page.
 - Every display command carries a version (strictly increasing, persisted); secondaries ignore older ones.
 - Notes are vector strokes in page-relative coordinates. The controller keeps the authoritative copy
-  (`filesDir/notes/<fileId>/<page>.json`) and sends a page's strokes with it. A secondary saves edits
+  (`filesDir/notes/<set ID>/<notes ID>/<page>.json`) and sends a page's strokes with it, together
+  with that notes key, which the secondary hands back with its edits. A secondary saves edits
   at once and marks them dirty; before it gets another page, the controller fetches and saves them
   (a display command is refused with `notes_unsaved` otherwise). If both sides changed a page while a
   secondary was offline, all strokes are kept.

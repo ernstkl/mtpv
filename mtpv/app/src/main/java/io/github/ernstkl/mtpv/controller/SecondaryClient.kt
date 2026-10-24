@@ -22,7 +22,15 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
     data class PairStatus(val status: String, val token: String?)
     /** [tools] is null if the secondary sent none it could read. */
     data class State(val fileId: String?, val page: Int, val version: Long, val tools: ToolState?)
-    data class Notes(val fileId: String?, val page: Int, val baseRev: Long, val rev: Long, val dirty: Boolean, val strokes: List<Stroke>)
+    data class Notes(
+        val fileId: String?,
+        val notesKey: String?,
+        val page: Int,
+        val baseRev: Long,
+        val rev: Long,
+        val dirty: Boolean,
+        val strokes: List<Stroke>,
+    )
 
     sealed interface DisplayResult {
         data object Ok : DisplayResult
@@ -55,6 +63,7 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
     fun notes(): Notes = request("GET", "/v1/notes").let { (_, json) ->
         Notes(
             fileId = json.optString("fileId").ifEmpty { null },
+            notesKey = json.optString("notesKey").ifEmpty { null },
             page = json.optInt("page"),
             baseRev = json.optLong("baseRev"),
             rev = json.optLong("rev"),
@@ -84,6 +93,7 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
         controller: String,
         version: Long,
         fileId: String?,
+        notesKey: String?,
         page: Int,
         notes: List<Stroke>,
         notesRev: Long,
@@ -93,6 +103,7 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
             .put("controller", controller)
             .put("version", version)
             .put("fileId", fileId ?: "")
+            .put("notesKey", notesKey ?: "")
             .put("page", page)
             .put("notes", NotesJson.toJson(notes))
             .put("notesRev", notesRev)

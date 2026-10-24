@@ -13,8 +13,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 
-/** What one secondary should show. page 0 is blank. */
-data class Target(val fileId: String?, val page: Int)
+/** What one secondary should show: a PDF's page and the key of its song's notes. page 0 is blank. */
+data class Target(val fileId: String?, val notesKey: String?, val page: Int)
 
 data class LinkStatus(
     val online: Boolean = false,
@@ -146,13 +146,13 @@ class SecondaryLink(
                     }
                     // Save what was written on the current page before it is replaced.
                     val back = client.notes()
-                    if (back.dirty && back.fileId != null && back.page > 0) notes.saveFromSecondary(uuid, back)
+                    if (back.dirty && back.notesKey != null && back.page > 0) notes.saveFromSecondary(uuid, back)
                     notes.hold(uuid, null)
-                    val key = fileId?.takeIf { want.page > 0 }?.let { PageKey(it, want.page) }
+                    val key = want.notesKey?.takeIf { fileId != null && want.page > 0 }?.let { PageKey(it, want.page) }
                     key?.let { notes.awaitFree(it, uuid) }
                     val page = key?.let { notes.load(it) }
                     val r = client.display(
-                        controllerId, versions.next(), fileId, want.page,
+                        controllerId, versions.next(), fileId, key?.notesKey, want.page,
                         page?.strokes.orEmpty(), page?.rev ?: 0, back.rev,
                     )
                     when (r) {

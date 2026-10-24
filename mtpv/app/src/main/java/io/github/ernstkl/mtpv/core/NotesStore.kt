@@ -42,35 +42,42 @@ object NotesJson {
 
 /**
  * The controller's notes, the authoritative copy: one JSON file per page under
- * filesDir/notes/<fileId>/<page>.json. Each save increments the page's revision, which lets
- * [NotesMerge] tell whether a secondary's edits can simply replace the stored version.
+ * filesDir/notes/<set ID>/<notes ID>/<page>.json (see [NotesKey]). Each save increments the page's
+ * revision, which lets [NotesMerge] tell whether a secondary's edits can simply replace the stored
+ * version. A file's last-modified time is when the page last changed: it is written only on a change.
  */
 class NotesStore(context: Context) {
     data class Page(val rev: Long, val strokes: List<Stroke>)
 
     private val dir = File(context.filesDir, "notes")
     private val loaded = HashMap<PageKey, Page>()
+    /** Songs whose notes were deleted; late edits from a secondary must not bring them back. */
+    private val deleted = HashSet<String>()
 
     /** Increments on every change, so the UI can reload. */
     private val _changes = MutableStateFlow(0L)
     val changes: StateFlow<Long> = _changes
 
+    init {
+        // Notes once were keyed by the PDF's hash alone; those are dropped.
+        dir.listFiles { f -> PdfCache.isValidId(f.name) }?.forEach { it.deleteRecursively() }
+    }
+
     @Synchronized
-    fun load(key: PageKey): Page = loaded.getOrPut(key) {
-        val f = file(key)
-        if (!f.isFile) {
-            Page(0, emptyList())
-        } else {
-            runCatching {
-                val o = JSONObject(f.readText())
-                Page(o.optLong("rev"), NotesJson.fromJson(o.optJSONArray("strokes")))
-            }.getOrDefault(Page(0, emptyList()))
-        }
+    fun load(key: PageKey): Page = loaded.getOrPut(key) { read(file(key)) ?: Page(0, emptyList()) }
+
+    private fun read(f: File): Page? {
+        if (!f.isFile) return null
+        return runCatching {
+            val o = JSONObject(f.readText())
+            Page(o.optLong("rev"), NotesJson.fromJson(o.optJSONArray("strokes")))
+        }.getOrNull()
     }
 
     @Synchronized
     fun save(key: PageKey, strokes: List<Stroke>): Page {
         val page = Page(load(key).rev + 1, strokes)
+        if (key.notesKey in deleted) return page
         val f = file(key)
         f.parentFile?.mkdirs()
         val tmp = File(f.parentFile, f.name + ".tmp")
@@ -90,8 +97,43 @@ class NotesStore(context: Context) {
         return conflict
     }
 
-    private fun file(key: PageKey): File {
-        require(PdfCache.isValidId(key.fileId)) { "invalid file id" }
-        return File(File(dir, key.fileId), "${key.page}.json")
+    /** When the notes of song [notesKey] last changed, or null if it has none. */
+    @Synchronized
+    fun lastChanged(notesKey: String): Long? {
+        val pages = pageFiles(notesKey)
+        if (pages.none { read(it)?.strokes?.isNotEmpty() == true }) return null
+        return pages.maxOf { it.lastModified() }
     }
+
+    /** Gives song [to] a copy of the notes of song [from], with their times. */
+    @Synchronized
+    fun copy(from: String, to: String) {
+        val target = songDir(to).apply { mkdirs() }
+        pageFiles(from).forEach { f ->
+            val copy = f.copyTo(File(target, f.name), overwrite = true)
+            copy.setLastModified(f.lastModified())
+        }
+        loaded.keys.removeAll { it.notesKey == to }
+        _changes.value++
+    }
+
+    /** Deletes the notes of song [notesKey], for good. */
+    @Synchronized
+    fun delete(notesKey: String) {
+        deleted += notesKey
+        loaded.keys.removeAll { it.notesKey == notesKey }
+        songDir(notesKey).deleteRecursively()
+        songDir(notesKey).parentFile?.delete() // the set's folder, if that was its last song
+        _changes.value++
+    }
+
+    private fun pageFiles(notesKey: String): List<File> =
+        songDir(notesKey).listFiles { f -> f.isFile && f.name.endsWith(".json") }.orEmpty().toList()
+
+    private fun songDir(notesKey: String): File {
+        require(NotesKey.isValid(notesKey)) { "invalid notes key" }
+        return File(dir, notesKey)
+    }
+
+    private fun file(key: PageKey) = File(songDir(key.notesKey), "${key.page}.json")
 }

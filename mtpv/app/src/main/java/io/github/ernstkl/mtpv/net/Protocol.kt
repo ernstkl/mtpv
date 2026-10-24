@@ -11,11 +11,11 @@ package io.github.ernstkl.mtpv.net
  *
  *   GET  /v1/files         {files: [id, ...]}
  *   PUT  /v1/files/{id}    raw PDF body; 409 hash_mismatch if the SHA-256 differs from {id}
- *   POST /v1/display       {controller, version, fileId, page, notes, notesRev, savedRev} -> state;
+ *   POST /v1/display       {controller, version, fileId, notesKey, page, notes, notesRev, savedRev} -> state;
  *                          409 stale_version (with current version), 404 unknown_file,
  *                          409 notes_unsaved if the shown page has edits newer than savedRev
  *   GET  /v1/state         {fileId, page, version, controller, tool, fingers, dark}
- *   GET  /v1/notes         {fileId, page, baseRev, rev, dirty, strokes}: notes of the shown page
+ *   GET  /v1/notes         {fileId, notesKey, page, baseRev, rev, dirty, strokes}: notes of the shown page
  *   POST /v1/tool          {tool, fingers, dark} -> {tool, fingers, dark}: note tool (a NoteTool name),
  *                          finger switch and dark pages; 400 bad_tool
  *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off" | "dark:on|off" |
@@ -32,8 +32,11 @@ package io.github.ernstkl.mtpv.net
  * Pages are 1-based; page 0 (or past the end) shows a blank screen.
  *
  * Notes: the controller holds the authoritative copy and sends a page's strokes with the display
- * command. Before it sends the next command it fetches the shown page's notes (GET /v1/notes) and
- * saves them if dirty, then passes their rev as savedRev.
+ * command. Notes belong to a song, not to the PDF: notesKey names the song's notes ("" with a blank
+ * page), fileId only the PDF to render, so two songs with the same PDF have notes of their own. The
+ * secondary hands the notesKey back with its notes, which files them under the song they were made
+ * on. Before it sends the next command the controller fetches the shown page's notes
+ * (GET /v1/notes) and saves them if dirty, then passes their rev as savedRev.
  *
  * Tool: the controller holds the note tool, finger switch and dark pages last picked on any screen
  * and sends all three with POST /v1/tool (resent when GET /v1/state reports others). A pick on a

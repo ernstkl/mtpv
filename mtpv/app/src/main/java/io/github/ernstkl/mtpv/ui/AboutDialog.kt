@@ -44,6 +44,10 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Text("Notes: draw with a stylus; pick pen, marker or eraser in the bar at the bottom left, ↶ undoes. " +
                     "Without a stylus, tap the square finger button (green = on) to draw with a finger; taps on the page then no longer turn it. " +
                     "Tool and finger button change on all screens at once.")
+                Text("Notes belong to the song: a copy of the PDF in another set has notes of its own. " +
+                    "Renaming a file keeps its notes; deleting it or changing its content deletes them. " +
+                    "If a new song's PDF has notes elsewhere, MTPV asks whether to start with a copy.")
+                Text("Moved the library? Pick it again under Library folder: sets keep their order, ticks and notes.")
                 Text("When MTPV comes back to the front on one screen, the screens showing another app " +
                     "get a notification; tap it to bring MTPV back there too.")
                 Text("Needs Android 10 or newer.")

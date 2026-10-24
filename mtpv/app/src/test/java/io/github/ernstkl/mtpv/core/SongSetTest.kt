@@ -6,13 +6,13 @@ import org.junit.Test
 
 class SongSetTest {
     // A: 2 pages, B: 3 pages, C: 1 page -> global pages 1-2, 3-5, 6.
-    private val set = SongSet.of("Gig", listOf(Song("A", "a", 2), Song("B", "b", 3), Song("C", "c", 1)))
+    private val set = SongSet.of("Gig", listOf(Song("A", "a", "na", 2), Song("B", "b", "nb", 3), Song("C", "c", "nc", 1)))
 
     @Test
     fun pagesRunOnAcrossSongs() {
         assertEquals(6, set.totalPages)
         assertEquals(
-            listOf(PageKey("a", 1), PageKey("a", 2), PageKey("b", 1), PageKey("b", 2), PageKey("b", 3), PageKey("c", 1)),
+            listOf(SongPage("a", "na", 1), SongPage("a", "na", 2), SongPage("b", "nb", 1), SongPage("b", "nb", 2), SongPage("b", "nb", 3), SongPage("c", "nc", 1)),
             (1..6).map { set.locate(it) },
         )
     }
@@ -32,16 +32,24 @@ class SongSetTest {
 
     @Test
     fun pageOfIsTheInverseOfLocate() {
-        (1..6).forEach { assertEquals(it, set.pageOf(set.locate(it)!!)) }
-        assertEquals(0, set.pageOf(PageKey("x", 1)))
-        assertEquals(0, set.pageOf(PageKey("a", 3)))
+        (1..6).forEach { assertEquals(it, set.pageOf(set.locate(it)!!.key)) }
+        assertEquals(0, set.pageOf(PageKey("nx", 1)))
+        assertEquals(0, set.pageOf(PageKey("na", 3)))
+    }
+
+    @Test
+    fun copiesOfOnePdfAreSongsOfTheirOwn() {
+        val s = SongSet.of("Gig", listOf(Song("before.pdf", "x", "n1", 2), Song("after.pdf", "x", "n2", 2)))
+        assertEquals(SongPage("x", "n2", 1), s.locate(3))
+        assertEquals(3, s.pageOf(PageKey("n2", 1)))
+        assertEquals(1, s.pageOf(PageKey("n1", 1)))
     }
 
     @Test
     fun filesWithoutPagesAreLeftOut() {
-        val s = SongSet.of("Gig", listOf(Song("A", "a", 2), Song("Empty", "e", 0), Song("C", "c", 1)))
+        val s = SongSet.of("Gig", listOf(Song("A", "a", "na", 2), Song("Empty", "e", "ne", 0), Song("C", "c", "nc", 1)))
         assertEquals(listOf("A", "C"), s.songs.map { it.name })
-        assertEquals(PageKey("c", 1), s.locate(3))
+        assertEquals(SongPage("c", "nc", 1), s.locate(3))
     }
 
     @Test
@@ -53,8 +61,8 @@ class SongSetTest {
 
     @Test
     fun singlePdfIsOneSong() {
-        val s = SongSet.of("x.pdf", listOf(Song("x.pdf", "x", 4)))
-        assertEquals(PageKey("x", 4), s.locate(4))
+        val s = SongSet.of("x.pdf", listOf(Song("x.pdf", "x", "nx", 4)))
+        assertEquals(SongPage("x", "nx", 4), s.locate(4))
         assertNull(s.locate(5))
     }
 
@@ -62,7 +70,7 @@ class SongSetTest {
     fun moveSong() {
         val moved = set.move(2, -2)
         assertEquals(listOf("C", "A", "B"), moved.songs.map { it.name })
-        assertEquals(PageKey("a", 1), moved.locate(2))
+        assertEquals(SongPage("a", "na", 1), moved.locate(2))
         assertEquals(set, set.move(0, -1))
     }
 
@@ -70,13 +78,13 @@ class SongSetTest {
     fun excludedSongsAddNoPages() {
         val s = set.exclude(1, true)
         assertEquals(3, s.totalPages)
-        assertEquals(listOf(PageKey("a", 1), PageKey("a", 2), PageKey("c", 1)), (1..3).map { s.locate(it) })
+        assertEquals(listOf(SongPage("a", "na", 1), SongPage("a", "na", 2), SongPage("c", "nc", 1)), (1..3).map { s.locate(it) })
         assertEquals(listOf(0, 0, 2), (1..3).map { s.songIndexAt(it) })
         assertEquals(listOf("A", "B", "C"), s.songs.map { it.name })
         assertEquals(listOf(1, 0, 2), (0..2).map { s.numberOf(it) })
         assertEquals(2, s.shownSongs)
-        assertEquals(0, s.pageOf(PageKey("b", 1)))
-        assertEquals(3, s.pageOf(PageKey("c", 1)))
+        assertEquals(0, s.pageOf(PageKey("nb", 1)))
+        assertEquals(3, s.pageOf(PageKey("nc", 1)))
         assertEquals(set, s.exclude(1, false))
     }
 
@@ -84,7 +92,7 @@ class SongSetTest {
     fun excludedAtTheEdges() {
         val first = set.exclude(0, true)
         assertEquals(listOf(1, 1, 1, 2), (1..4).map { first.songIndexAt(it) })
-        assertEquals(PageKey("b", 1), first.locate(1))
+        assertEquals(SongPage("b", "nb", 1), first.locate(1))
         val last = set.exclude(2, true)
         assertEquals(5, last.totalPages)
         assertEquals(1, last.songIndexAt(5))

@@ -19,8 +19,8 @@ build, usage and protocol summary: `mtpv/README.md`.
   and keep its doc comment in sync. During development all devices run the same app version: no
   fallbacks for older controllers or secondaries.
 - Keep the invariants from `CONCEPT.md`: display commands are versioned and never go backwards,
-  files and notes are keyed by SHA-256, the controller owns the authoritative notes and fetches a
-  secondary's edits before giving it another page.
+  files are keyed by SHA-256 and notes by song (set ID and notes ID), the controller owns the
+  authoritative notes and fetches a secondary's edits before giving it another page.
 - Pure logic belongs in `core/` with unit tests (`app/src/test/`); Android-only code stays thin around it.
 - minSdk is 29 for both roles. Guard newer APIs.
 - When behaviour visible to users changes, update `mtpv/README.md` and the About dialog

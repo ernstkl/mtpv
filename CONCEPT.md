@@ -50,11 +50,17 @@ up to the last page. A page turn on any screen moves *start* by one, so every sc
   learns about sets, so song sets needed no protocol change. Each PDF is copied into the
   controller's cache, so a file changing in the folder cannot change content under a known hash.
   A folder's stored order is keyed by its document ID, so it is the same folder whether it was
-  picked directly or reached through the library.
+  picked directly or reached through the library. Each set record also has a random set ID and its
+  path below the library folder; when the library moves, a folder without a record takes over the
+  one with the same path, set ID and all.
 - **Nothing on the page but the page.** The controller's menu is a drawer, opened by a tap in the
   middle or a small ☰ button; there is no edge swipe, so it never clashes with the pen or page turns.
 - **Content-addressed files.** PDFs are identified by their SHA-256, uploaded once and cached on both
-  sides. Notes are keyed by the same hash, so a changed PDF starts with no notes.
+  sides.
+- **Notes per song.** Notes belong to a song (a file name in a set), keyed by the set ID and a random
+  notes ID, so copies of one PDF have notes of their own. A display command names the PDF to render
+  and, separately, the song's notes key. A song's notes follow a rename and are deleted when its file
+  leaves the folder or changes; a new song may start with a copy of another song's notes for the same hash.
 - **Single owner for notes.** The controller holds the authoritative copy of all notes. A secondary
   edits only the page it shows; the controller fetches those edits before it gives that secondary
   another page. Strokes are vectors in page-relative coordinates, independent of screen size.

@@ -1,11 +1,17 @@
 package io.github.ernstkl.mtpv.core
 
 /**
- * One PDF of a set. [name] is its file name, which also keys its place in the stored order.
+ * One PDF of a set. [name] is its file name, which also keys its place in the stored order;
+ * [fileId] names the PDF's content and [notesKey] the song's notes (see [NotesKey]).
  * An [excluded] song stays in the set's list but adds no pages to the stream.
  */
-data class Song(val name: String, val fileId: String, val pageCount: Int, val excluded: Boolean = false) {
+data class Song(val name: String, val fileId: String, val notesKey: String, val pageCount: Int, val excluded: Boolean = false) {
     val shownPages get() = if (excluded) 0 else pageCount
+}
+
+/** A page of a song: the PDF and the 1-based page in it to show, and where its notes are. */
+data class SongPage(val fileId: String, val notesKey: String, val page: Int) {
+    val key get() = PageKey(notesKey, page)
 }
 
 /**
@@ -44,15 +50,15 @@ class SongSet private constructor(val name: String, val songs: List<Song>) {
 
     val shownSongs: Int get() = songs.count { !it.excluded }
 
-    /** File and page within it shown at global [page], or null for a blank screen. */
-    fun locate(page: Int): PageKey? {
+    /** Song page shown at global [page], or null for a blank screen. */
+    fun locate(page: Int): SongPage? {
         val i = songIndexAt(page)
-        return if (i < 0) null else PageKey(songs[i].fileId, page - firsts[i] + 1)
+        return if (i < 0) null else songs[i].let { SongPage(it.fileId, it.notesKey, page - firsts[i] + 1) }
     }
 
-    /** Global page that shows [key], or 0 if the set does not contain it. The first song with that file wins. */
+    /** Global page that shows [key], or 0 if the set does not contain it (or leaves its song out). */
     fun pageOf(key: PageKey): Int {
-        val i = songs.indexOfFirst { it.fileId == key.fileId && key.page in 1..it.shownPages }
+        val i = songs.indexOfFirst { it.notesKey == key.notesKey && key.page in 1..it.shownPages }
         return if (i < 0) 0 else firsts[i] + key.page - 1
     }
 

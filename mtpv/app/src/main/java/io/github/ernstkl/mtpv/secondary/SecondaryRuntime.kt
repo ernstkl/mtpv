@@ -27,12 +27,13 @@ import java.io.IOException
 import java.net.Inet4Address
 
 /**
- * Notes of the page a secondary shows. [rev] counts edits on this device and never resets;
- * [dirty] means there are edits the controller has not fetched yet. [baseRev] is the controller's
- * revision of the notes it sent with the page.
+ * Notes of the page a secondary shows; [notesKey] names the song they belong to on the controller.
+ * [rev] counts edits on this device and never resets; [dirty] means there are edits the controller
+ * has not fetched yet. [baseRev] is the controller's revision of the notes it sent with the page.
  */
 data class ShownNotes(
     val fileId: String?,
+    val notesKey: String?,
     val page: Int,
     val baseRev: Long,
     val rev: Long,
@@ -143,6 +144,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         controller: String,
         version: Long,
         fileId: String?,
+        notesKey: String?,
         page: Int,
         notes: List<Stroke>,
         notesRev: Long,
@@ -164,7 +166,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         val next = DisplayState(fileId, page, version, controller)
         _display.value = next
         prefs.saveDisplay(next)
-        setShownNotes(ShownNotes(fileId, page, notesRev, shown.rev, dirty = false, strokes = notes))
+        setShownNotes(ShownNotes(fileId, notesKey, page, notesRev, shown.rev, dirty = false, strokes = notes))
         fileId?.let { cache.touch(it) }
         return SecondaryServer.ok(stateJson(next))
     }
@@ -176,7 +178,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
     fun editNotes(key: PageKey, strokes: List<Stroke>) {
         val cur = _notes.value
         // Page changes wait while the pen is down (see isWriting), so this only misses after a timeout.
-        if (cur.fileId != key.fileId || cur.page != key.page) {
+        if (cur.notesKey != key.notesKey || cur.page != key.page) {
             Log.w(TAG, "dropped notes for page ${key.page}, now showing ${cur.page}")
             return
         }
@@ -199,6 +201,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
     fun notesJson(): JSONObject = _notes.value.let { n ->
         JSONObject()
             .put("fileId", n.fileId ?: "")
+            .put("notesKey", n.notesKey ?: "")
             .put("page", n.page)
             .put("baseRev", n.baseRev)
             .put("rev", n.rev)
@@ -218,13 +221,14 @@ class SecondaryRuntime(private val app: MtpvApp) {
         val o = JSONObject(notesFile.readText())
         ShownNotes(
             fileId = o.optString("fileId").ifEmpty { null },
+            notesKey = o.optString("notesKey").ifEmpty { null },
             page = o.optInt("page"),
             baseRev = o.optLong("baseRev"),
             rev = o.optLong("rev"),
             dirty = o.optBoolean("dirty"),
             strokes = NotesJson.fromJson(o.optJSONArray("strokes")),
         )
-    }.getOrDefault(ShownNotes(null, 0, 0, 0, false, emptyList()))
+    }.getOrDefault(ShownNotes(null, null, 0, 0, 0, false, emptyList()))
 
     // --- note tool and finger switch, the same on all screens ---
 

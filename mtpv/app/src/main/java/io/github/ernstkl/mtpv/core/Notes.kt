@@ -1,6 +1,7 @@
 package io.github.ernstkl.mtpv.core
 
 import org.json.JSONObject
+import java.util.UUID
 import kotlin.math.hypot
 
 enum class Tool { PEN, MARKER }
@@ -70,8 +71,22 @@ class Stroke(val id: Long, val tool: Tool, val color: Int, val width: Float, val
     override fun hashCode() = id.hashCode()
 }
 
-/** Identifies the notes of one page: the PDF's SHA-256 and the 1-based page number. */
-data class PageKey(val fileId: String, val page: Int)
+/** Identifies the notes of one page: the song's [NotesKey] and the 1-based page number. */
+data class PageKey(val notesKey: String, val page: Int)
+
+/**
+ * Names the notes of one song: "<set ID>/<notes ID>", both random. Notes belong to a song (a file
+ * name in a set), not to the PDF's content, so two copies of a PDF have notes of their own.
+ */
+object NotesKey {
+    private val ID = Regex("[0-9a-f]{32}")
+
+    fun newId(): String = UUID.randomUUID().toString().replace("-", "")
+
+    fun of(setId: String, notesId: String) = "$setId/$notesId"
+
+    fun isValid(key: String): Boolean = key.split('/').let { it.size == 2 && it.all(ID::matches) }
+}
 
 object NotesMerge {
     /**
