@@ -1,7 +1,6 @@
 package io.github.ernstkl.mtpv.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,11 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,11 +68,11 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                 onLongPress = { showInfo = true },
             ),
     ) {
-        PageView(display.fileId, display.page, rt::render) { fileId, page ->
+        PageView(display.fileId, display.page, rt::render, dark = tools.dark) { fileId, page ->
             if (notes.fileId == fileId && notes.page == page) {
                 NotesLayer(
                     PageKey(fileId, page), notes.strokes, tools.tool, enabled = true,
-                    onChange = rt::editNotes, onPen = rt::setPenDown, fingers = tools.fingers,
+                    onChange = rt::editNotes, onPen = rt::setPenDown, fingers = tools.fingers, dark = tools.dark,
                 )
             }
         }
@@ -100,26 +96,17 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
             }
         }
 
-        // A tap target only, so the pen still draws right next to it.
-        Box(
-            Modifier
-                .align(Alignment.TopStart)
-                .padding(4.dp)
-                .size(40.dp)
-                .background(Color(0x66000000), CircleShape)
-                .clickable(onClickLabel = "Menu") { showInfo = true },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White.copy(alpha = 0.6f))
-        }
+        MenuButton({ showInfo = true }, Modifier.align(Alignment.TopStart))
 
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                .padding(6.dp)
-                .size(8.dp)
-                .background(if (connected) Color(0xFF2E7D32) else Color(0xFFC62828), CircleShape),
-        )
+        Row(Modifier.align(Alignment.TopEnd)) {
+            DarkPagesButton(tools.dark, rt::setDark)
+            Box(
+                Modifier
+                    .padding(6.dp)
+                    .size(8.dp)
+                    .background(if (connected) Color(0xFF2E7D32) else Color(0xFFC62828), CircleShape),
+            )
+        }
     }
 
     if (showInfo) {

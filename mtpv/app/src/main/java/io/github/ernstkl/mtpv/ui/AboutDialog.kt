@@ -37,8 +37,10 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     "then pick a set under Open set from library…. A folder with subfolders opens to show them; ↑ goes back up.")
                 Text("The songs follow each other in alphabetical order, like one long PDF. " +
                     "Under Songs, tap a song to jump to it, drag ≡ to change the order, untick a song to leave it out.")
-                Text("Controller: tap the middle or ☰ for the menu. Secondary: tap the middle or ☰ for its address and settings. " +
+                Text("Controller: tap the middle or ☰ for the menu; ♫ next to it lists the songs (only the controller has it). " +
+                    "Secondary: tap the middle or ☰ for its address and settings. " +
                     "If a secondary isn't found, enter its address under Screens.")
+                Text("◐ at the top right turns dark pages on or off on all screens: white paper turns black, notes keep their colours.")
                 Text("Notes: draw with a stylus; pick pen, marker or eraser in the bar at the bottom left, ↶ undoes. " +
                     "Without a stylus, tap the square finger button (green = on) to draw with a finger; taps on the page then no longer turn it. " +
                     "Tool and finger button change on all screens at once.")

@@ -57,7 +57,7 @@ class Prefs(private val context: Context) {
         get() = sp.getBoolean("aboutShown", false)
         set(value) = sp.edit().putBoolean("aboutShown", value).apply()
 
-    /** The controller's note tool and finger switch, the same on all screens. */
+    /** Note tool, finger switch and dark pages, the same on all screens: the controller's own, or the last it sent here. */
     var tools: ToolState
         get() = sp.getString("tools", null)?.let { runCatching { ToolSync.fromJson(JSONObject(it)) }.getOrNull() } ?: ToolState()
         set(value) = sp.edit().putString("tools", ToolSync.toJson(value).toString()).apply()

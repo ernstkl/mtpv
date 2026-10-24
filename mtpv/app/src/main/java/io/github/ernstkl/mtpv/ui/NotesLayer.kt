@@ -46,6 +46,7 @@ import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.ernstkl.mtpv.core.DarkPages
 import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.NotesGeometry
 import io.github.ernstkl.mtpv.core.PageKey
@@ -58,7 +59,8 @@ import kotlin.random.Random
  * end, or the eraser tool, removes whole strokes), so fingers still turn pages underneath. With
  * [fingers], a finger draws like the stylus, and taps on the page no longer turn it. Each change
  * names the page the stroke started on, even if the screen has moved to another page meanwhile.
- * [onPen] reports whether the stylus (or drawing finger) is down.
+ * [onPen] reports whether the stylus (or drawing finger) is down. With [dark], strokes are drawn for
+ * a dark page ([DarkPages]).
  */
 @OptIn(ExperimentalComposeUiApi::class) // historical points: smooth strokes at high stylus sample rates
 @Composable
@@ -70,6 +72,7 @@ fun NotesLayer(
     onChange: (PageKey, List<Stroke>) -> Unit,
     modifier: Modifier = Modifier,
     fingers: Boolean = false,
+    dark: Boolean = false,
     onPen: (Boolean) -> Unit = {},
 ) {
     val currentPage by rememberUpdatedState(page)
@@ -137,18 +140,29 @@ fun NotesLayer(
                 }
             },
     ) {
-        strokes.forEach { drawNote(it.tool, it.color, it.width, it.points) }
-        liveTool?.let { t -> if (t.tool != null) drawNote(t.tool, t.color.toInt(), t.width, live.toFloatArray()) }
+        strokes.forEach { drawNote(it.tool, it.color, it.width, it.points, dark) }
+        liveTool?.let { t -> if (t.tool != null) drawNote(t.tool, t.color.toInt(), t.width, live.toFloatArray(), dark) }
     }
 }
 
-private fun DrawScope.drawNote(tool: Tool, color: Int, width: Float, points: FloatArray) {
+private fun DrawScope.drawNote(tool: Tool, color: Int, width: Float, points: FloatArray, dark: Boolean) {
     if (points.size < 2) return
     val w = size.width
     val h = size.height
-    // The marker multiplies with the page, so it tints the paper but leaves black notes black.
-    val blend = if (tool == Tool.MARKER) BlendMode.Multiply else BlendMode.SrcOver
-    val c = Color(color)
+    // The marker multiplies with the page, so it tints the paper but leaves black notes black;
+    // on a dark page it screens instead, tinting the black paper and leaving light notes light.
+    val blend = when {
+        tool != Tool.MARKER -> BlendMode.SrcOver
+        dark -> BlendMode.Screen
+        else -> BlendMode.Multiply
+    }
+    val c = Color(
+        when {
+            !dark -> color
+            tool == Tool.MARKER -> DarkPages.marker(color)
+            else -> DarkPages.pen(color)
+        }
+    )
     val px = width * w
     if (points.size == 2) {
         drawCircle(c, radius = px / 2, center = Offset(points[0] * w, points[1] * h), blendMode = blend)

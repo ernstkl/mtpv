@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,11 +19,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
@@ -105,7 +101,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                         Text(pageSummary(st), style = MaterialTheme.typography.bodySmall)
                     }
                     s.set?.let { set ->
-                        if (s.folder != null || set.songs.size > 1) {
+                        if (hasSongs(st)) {
                             val count = if (set.shownSongs == set.songs.size) "${set.songs.size}" else "${set.shownSongs}/${set.songs.size}"
                             MenuItem("Songs ($count)") { menu { showSongs = true } }
                         }
@@ -137,11 +133,12 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                 }),
         ) {
             val own = st.ownTarget
-            PageView(own?.fileId, own?.page ?: 0, rt::render) { fileId, page ->
+            PageView(own?.fileId, own?.page ?: 0, rt::render, dark = st.tools.dark) { fileId, page ->
                 val key = PageKey(fileId, page)
                 val strokes = remember(key, changes) { rt.load(key).strokes }
                 // While a secondary still holds this page's latest notes, wait for them before drawing.
-                NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes, fingers = st.tools.fingers)
+                NotesLayer(key, strokes, st.tools.tool, enabled = st.holderOf(key) == null, onChange = rt::editNotes,
+                    fingers = st.tools.fingers, dark = st.tools.dark)
             }
             if (own?.fileId != null && own.page > 0) {
                 val key = PageKey(own.fileId, own.page)
@@ -158,20 +155,15 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                 Text("Tap ☰ to choose a set.", Modifier.align(Alignment.Center).padding(32.dp))
             }
 
-            // A tap target only, so the pen still draws right next to it.
-            Box(
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(4.dp)
-                    .size(40.dp)
-                    .background(Color(0x66000000), CircleShape)
-                    .clickable(onClickLabel = "Menu") { scope.launch { drawer.open() } },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White.copy(alpha = 0.6f))
+            Row(Modifier.align(Alignment.TopStart)) {
+                MenuButton({ scope.launch { drawer.open() } })
+                SongsButton({ if (hasSongs(st)) showSongs = true else showSets = true })
             }
 
-            StatusDots(st, Modifier.align(Alignment.TopEnd).padding(6.dp))
+            Row(Modifier.align(Alignment.TopEnd)) {
+                DarkPagesButton(st.tools.dark, rt::setDark)
+                StatusDots(st, Modifier.padding(6.dp))
+            }
 
             st.busy?.let {
                 Text(it, Modifier.align(Alignment.BottomCenter).background(Color(0xCC000000)).padding(12.dp))
@@ -226,6 +218,12 @@ private fun MenuItem(label: String, subtitle: String? = null, onClick: () -> Uni
         onClick = onClick,
         modifier = Modifier.padding(horizontal = 12.dp),
     )
+}
+
+/** The open set is worth a song list: read from a folder, or more than one song. */
+private fun hasSongs(st: ControllerState): Boolean {
+    val set = st.session.set ?: return false
+    return st.session.folder != null || set.songs.size > 1
 }
 
 private fun pageSummary(st: ControllerState): String {

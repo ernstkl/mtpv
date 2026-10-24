@@ -121,6 +121,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         ))
     val state: StateFlow<ControllerState> = _state
 
+    /** A set with a file gone from the cache is dropped; [start] reads it again from its folder, if it has one. */
     private fun restoreSession(): ControllerSession {
         val s = prefs.loadSession()
         val withSelf = if (Paging.SELF in s.arrangement) s.arrangement else listOf(Paging.SELF) + s.arrangement
@@ -131,6 +132,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun start() {
         discovery = Discovery(app, ::onFound).also { it.start() }
         syncLinks()
+        if (_state.value.session.set == null) reloadFolder()
     }
 
     fun stop() {
@@ -210,12 +212,17 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 withContext(Dispatchers.Main) {
                     updateSession { s ->
                         // Reading the same folder again keeps the page on the first screen, if it is still there.
-                        val same = s.folder == folder.toString()
-                        val first = if (same) s.set?.locate(s.start)?.let(set::pageOf) ?: 0 else 0
+                        val first = when {
+                            s.folder != folder.toString() -> 1
+                            // Restored without its set: keep the page number.
+                            s.set == null -> s.start
+                            else -> s.set.locate(s.start)?.let(set::pageOf) ?: 1
+                        }
                         s.copy(set = set, folder = folder.toString(), start = first.coerceAtLeast(1))
                     }
                 }
                 cache.evict(set.songs.map { it.fileId }.toSet())
+                releaseUnusedFolders()
             } catch (e: Exception) {
                 showMessage("Could not open the folder: ${e.message}")
             } finally {
@@ -241,6 +248,16 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         }
         prefs.library = tree.toString()
         browse(emptyList())
+        releaseUnusedFolders()
+    }
+
+    /**
+     * Gives up read access to folders no longer needed (Android keeps at most 512 grants per app):
+     * all but the library folder and the folder the open set was read from.
+     */
+    private fun releaseUnusedFolders() {
+        val keep = listOfNotNull(prefs.library, _state.value.session.folder).map(Uri::parse)
+        runCatching { folders.releaseAllBut(keep) }
     }
 
     /**
@@ -473,6 +490,8 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun setTool(t: NoteTool) = setTools(_state.value.tools.copy(tool = t))
 
     fun setFingers(on: Boolean) = setTools(_state.value.tools.copy(fingers = on))
+
+    fun setDark(on: Boolean) = setTools(_state.value.tools.copy(dark = on))
 
     /** Picked here or on a secondary (main thread); every screen follows. */
     private fun setTools(t: ToolState) {

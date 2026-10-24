@@ -54,8 +54,11 @@ class SecondaryRuntime(private val app: MtpvApp) {
     private val _notes = MutableStateFlow(loadNotes())
     val notes: StateFlow<ShownNotes> = _notes
 
-    /** Note tool and finger switch; the controller resends its own after a restart of this app. */
-    private val _tools = MutableStateFlow(ToolState())
+    /**
+     * Note tool, finger switch and dark pages, kept across restarts so pages stay dark until the
+     * controller is back; the controller resends its own after a restart of this app.
+     */
+    private val _tools = MutableStateFlow(prefs.tools)
     val tools: StateFlow<ToolState> = _tools
 
     /** Time of the last request from a controller, for the "connected" indicator. */
@@ -227,17 +230,25 @@ class SecondaryRuntime(private val app: MtpvApp) {
 
     /** Picked on this screen: passed on to the controller, which picks it on the other screens. */
     fun pickTool(t: NoteTool) {
-        _tools.value = _tools.value.copy(tool = t)
+        setTools(_tools.value.copy(tool = t))
         sendInput(ToolSync.event(t))
     }
 
     fun setFingers(on: Boolean) {
-        _tools.value = _tools.value.copy(fingers = on)
+        setTools(_tools.value.copy(fingers = on))
         sendInput(ToolSync.event(on))
     }
 
-    fun toolsFromController(t: ToolState) {
+    fun setDark(on: Boolean) {
+        setTools(_tools.value.copy(dark = on))
+        sendInput(ToolSync.darkEvent(on))
+    }
+
+    fun toolsFromController(t: ToolState) = setTools(t)
+
+    private fun setTools(t: ToolState) {
         _tools.value = t
+        prefs.tools = t
     }
 
     // --- page turns and tool picks entered on this device, fetched by the controller via long polling ---

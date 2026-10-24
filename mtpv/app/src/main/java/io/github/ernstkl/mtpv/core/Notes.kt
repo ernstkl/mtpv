@@ -14,27 +14,37 @@ enum class NoteTool(val tool: Tool?, val color: Long, val width: Float) {
     ERASER(null, 0xFFFFFFFF, 0f),
 }
 
-/** How notes are drawn on every screen: the tool, and whether a finger draws too (the stylus always does). */
-data class ToolState(val tool: NoteTool = NoteTool.PEN_BLACK, val fingers: Boolean = false)
+/**
+ * How every screen draws: the note tool, whether a finger draws too (the stylus always does), and
+ * whether pages are shown [dark] (see [DarkPages]).
+ */
+data class ToolState(val tool: NoteTool = NoteTool.PEN_BLACK, val fingers: Boolean = false, val dark: Boolean = false)
 
 /**
  * The tool state picked on one screen is picked on all of them. A secondary reports a pick to the
- * controller as an input event, "tool:<name>" or "fingers:on|off"; the controller sends the whole
- * state as JSON {tool, fingers}.
+ * controller as an input event, "tool:<name>", "fingers:on|off" or "dark:on|off"; the controller
+ * sends the whole state as JSON {tool, fingers, dark}.
  */
 object ToolSync {
     private const val TOOL = "tool:"
     private const val FINGERS = "fingers:"
+    private const val DARK = "dark:"
 
     fun event(tool: NoteTool) = TOOL + tool.name
 
-    fun event(fingers: Boolean) = FINGERS + if (fingers) "on" else "off"
+    fun event(fingers: Boolean) = FINGERS + onOff(fingers)
+
+    fun darkEvent(dark: Boolean) = DARK + onOff(dark)
+
+    private fun onOff(b: Boolean) = if (b) "on" else "off"
 
     /** [state] with the pick from input event [e], or null if it is another event. */
     fun apply(state: ToolState, e: String): ToolState? = when {
         e.startsWith(TOOL) -> parse(e.removePrefix(TOOL))?.let { state.copy(tool = it) }
         e == event(true) -> state.copy(fingers = true)
         e == event(false) -> state.copy(fingers = false)
+        e == darkEvent(true) -> state.copy(dark = true)
+        e == darkEvent(false) -> state.copy(dark = false)
         else -> null
     }
 
@@ -42,11 +52,11 @@ object ToolSync {
     fun parse(name: String): NoteTool? = NoteTool.entries.firstOrNull { it.name == name }
 
     fun toJson(state: ToolState, into: JSONObject = JSONObject()): JSONObject =
-        into.put("tool", state.tool.name).put("fingers", state.fingers)
+        into.put("tool", state.tool.name).put("fingers", state.fingers).put("dark", state.dark)
 
     /** Null if [json] names no known tool. */
     fun fromJson(json: JSONObject): ToolState? =
-        parse(json.optString("tool"))?.let { ToolState(it, json.optBoolean("fingers")) }
+        parse(json.optString("tool"))?.let { ToolState(it, json.optBoolean("fingers"), json.optBoolean("dark")) }
 }
 
 /**

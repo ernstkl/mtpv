@@ -62,11 +62,43 @@ class ToolSyncTest {
     }
 
     @Test
+    fun darkEventChangesOnlyDarkPages() {
+        assertEquals(ToolState(NoteTool.MARKER, true, dark = true), ToolSync.apply(ToolState(NoteTool.MARKER, true), ToolSync.darkEvent(true)))
+        assertEquals(ToolState(NoteTool.MARKER, true), ToolSync.apply(ToolState(NoteTool.MARKER, true, dark = true), ToolSync.darkEvent(false)))
+    }
+
+    @Test
     fun pageTurnsAndUnknownToolsAreNoToolEvents() {
         assertNull(ToolSync.apply(start, "next"))
         assertNull(ToolSync.apply(start, "prev"))
         assertNull(ToolSync.apply(start, "tool:LASER"))
         assertNull(ToolSync.apply(start, "fingers:maybe"))
+        assertNull(ToolSync.apply(start, "dark:maybe"))
         assertNull(ToolSync.parse(""))
+    }
+}
+
+class DarkPagesTest {
+    private fun rgb(c: Int) = Triple(c ushr 16 and 0xFF, c ushr 8 and 0xFF, c and 0xFF)
+
+    @Test
+    fun whiteAndBlackSwap() {
+        assertEquals(0xFF000000.toInt(), DarkPages.pen(0xFFFFFFFF.toInt()))
+        assertEquals(0xFFFFFFFF.toInt(), DarkPages.pen(0xFF000000.toInt()))
+    }
+
+    @Test
+    fun pensKeepTheirHueAndGetLighter() {
+        val (r, g, b) = rgb(DarkPages.pen(NoteTool.PEN_RED.color.toInt()))
+        assertTrue(r > g + 60 && r > b + 60 && g > 0x2F)
+        val (r2, g2, b2) = rgb(DarkPages.pen(NoteTool.PEN_BLUE.color.toInt()))
+        assertTrue(b2 > r2 + 60 && b2 > g2 && r2 > 0x15)
+    }
+
+    @Test
+    fun markerIsDimmedKeepingAlpha() {
+        val m = DarkPages.marker(0x80FFEB3B.toInt())
+        assertEquals(0x80, m ushr 24)
+        assertEquals(Triple(114, 105, 26), rgb(m))
     }
 }

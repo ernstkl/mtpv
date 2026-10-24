@@ -31,6 +31,18 @@ class Folders(private val context: Context) {
     /** Keeps read access to the picked [tree] across restarts. */
     fun keepAccess(tree: Uri) = resolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
+    /** Releases every kept tree except those that [keep] (trees, or folders below them) are reached through. */
+    fun releaseAllBut(keep: List<Uri>) {
+        val needed = keep.mapNotNull { treeKey(it) }.toSet()
+        resolver.persistedUriPermissions.filter { treeKey(it.uri) !in needed }.forEach {
+            resolver.releasePersistableUriPermission(it.uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    /** Authority and tree document ID: the same for a tree URI and every document URI built on it. */
+    private fun treeKey(uri: Uri): Pair<String?, String>? =
+        runCatching { uri.authority to DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
+
     fun name(folder: Uri): String =
         resolver.query(folder, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) c.getString(0) else null

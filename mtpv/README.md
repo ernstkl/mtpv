@@ -36,6 +36,8 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    to show it from the leftmost screen, drag ≡ to change the order, untick a song to leave its pages
    out (it stays in the list, so it can be ticked again). Order and ticks are kept for that folder.
    **Reload folder** picks up added or removed PDFs. The top of the menu shows the song on the leftmost screen.
+   **♫** next to ☰ opens **Songs** directly (or the library, without a set); only the controller has it,
+   so it also shows which screen is the controller.
    **Open set from library…** browses the library: a folder without subfolders
    opens as a set at a tap, one with subfolders opens to show them (↑ goes back up), and *Show this
    folder as a set* opens the PDFs of the folder shown. The open set is marked. Folders starting with
@@ -47,7 +49,8 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    is in front, a notification "MTPV: tap to show" appears. (Android does not let an app jump to
    the front by itself.)
 6. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
-   page and arrangement and reconnects; secondaries keep the last page until it does.
+   page and arrangement and reconnects; secondaries keep the last page until it does. If a file of a
+   set read from a folder has gone from the PDF cache, the controller reads the folder again.
 
 Notes: write with the stylus on any screen; fingers keep turning pages. The tool bar in the
 bottom-left corner picks black/red/blue pen, yellow marker or eraser with one tap; the selected one
@@ -57,6 +60,10 @@ undone). Without a stylus, tap the square finger switch at the left of the bar (
 finger then draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
 Tool and finger switch are the same on all screens, like one big sheet of paper: what you pick on
 one screen is picked on all of them. The stylus draws on every screen whatever the switch says. Notes belong to the PDF's content: a changed PDF starts without notes.
+
+Dark pages: **◐** at the top right of any screen swaps light and dark on all screens, so white paper turns black.
+Colours keep their hue (red notes stay red); the marker tints the black paper instead of the white.
+The setting is kept across restarts. PdfRenderer has no dark mode, so the page is drawn through a colour matrix.
 
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
 On a secondary, tap the middle of the screen (or ☰ top left) for its address, paired controllers and **Device role**.
@@ -88,8 +95,10 @@ On a secondary, tap the middle of the screen (or ☰ top left) for its address, 
   `POST /v1/front` to each secondary; on a secondary, it reports a `front` event over the long poll
   and the controller passes it on. A screen not showing MTPV posts a heads-up notification; tapping
   it brings MTPV to the front without waking the others again.
-- Note tool and finger switch work the same way: the controller holds the last ones picked on any
-  screen and sends them to every secondary (`POST /v1/tool`).
+- Note tool, finger switch and dark pages work the same way: the controller holds the last ones
+  picked on any screen and sends them to every secondary (`POST /v1/tool`).
+- Folder access: MTPV keeps read access only to the library folder and the open set's folder, and
+  gives up the rest (Android allows an app at most 512 such grants).
 
 While a role is active, a foreground service (with a notification) keeps the app running when it is not
 on screen, so a secondary keeps serving and the controller keeps receiving page turns.

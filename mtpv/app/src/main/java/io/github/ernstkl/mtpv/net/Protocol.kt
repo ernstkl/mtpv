@@ -14,11 +14,12 @@ package io.github.ernstkl.mtpv.net
  *   POST /v1/display       {controller, version, fileId, page, notes, notesRev, savedRev} -> state;
  *                          409 stale_version (with current version), 404 unknown_file,
  *                          409 notes_unsaved if the shown page has edits newer than savedRev
- *   GET  /v1/state         {fileId, page, version, controller, tool, fingers}
+ *   GET  /v1/state         {fileId, page, version, controller, tool, fingers, dark}
  *   GET  /v1/notes         {fileId, page, baseRev, rev, dirty, strokes}: notes of the shown page
- *   POST /v1/tool          {tool, fingers} -> {tool, fingers}: note tool (a NoteTool name) and finger
- *                          switch; 400 bad_tool
- *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off" | "front", ...]};
+ *   POST /v1/tool          {tool, fingers, dark} -> {tool, fingers, dark}: note tool (a NoteTool name),
+ *                          finger switch and dark pages; 400 bad_tool
+ *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off" | "dark:on|off" |
+ *                          "front", ...]};
  *                          long poll, answers
  *                          as soon as the secondary has input after N, or after INPUT_WAIT_MS with none
  *   POST /v1/front         {} -> {shown}: MTPV came (back) to the front on another screen of the setup.
@@ -34,9 +35,9 @@ package io.github.ernstkl.mtpv.net
  * command. Before it sends the next command it fetches the shown page's notes (GET /v1/notes) and
  * saves them if dirty, then passes their rev as savedRev.
  *
- * Tool: the controller holds the note tool and finger switch last picked on any screen and sends
- * both with POST /v1/tool (resent when GET /v1/state reports others). A pick on a secondary becomes a
- * "tool:<name>" or "fingers:on|off" input event.
+ * Tool: the controller holds the note tool, finger switch and dark pages last picked on any screen
+ * and sends all three with POST /v1/tool (resent when GET /v1/state reports others). A pick on a
+ * secondary becomes a "tool:<name>", "fingers:on|off" or "dark:on|off" input event.
  *
  * Front: when MTPV comes (back) to the front on the controller, it sends POST /v1/front to every
  * secondary; on a secondary, that secondary reports a "front" input event and the controller passes
