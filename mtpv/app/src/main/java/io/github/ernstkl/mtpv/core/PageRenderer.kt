@@ -53,6 +53,10 @@ class RendererHolder(private val cache: PdfCache) {
         return renderer
     }
 
+    /** Pages of [fileId], 0 if it cannot be read. */
+    @Synchronized
+    fun pageCount(fileId: String): Int = get(fileId)?.pageCount ?: 0
+
     /** Synchronized so that a [get] for another file cannot close the renderer between lookup and render. */
     @Synchronized
     fun render(fileId: String?, page: Int, maxW: Int, maxH: Int): Bitmap? =

@@ -68,7 +68,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                 onLongPress = { showInfo = true },
             ),
     ) {
-        PageView(display.fileId, display.page, rt::render, dark = tools.dark) { fileId, page ->
+        PageView(display.fileId, display.page, rt::render, rt::pageCount, dark = tools.dark) { fileId, page ->
             val notesKey = notes.notesKey
             if (notes.fileId == fileId && notes.page == page && notesKey != null) {
                 NotesLayer(

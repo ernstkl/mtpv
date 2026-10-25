@@ -42,6 +42,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Text("Controller: tap the middle or ☰ for the menu; ♫ next to it lists the songs (only the controller has it). " +
                     "Secondary: tap the middle or ☰ for its address and settings. " +
                     "If a secondary isn't found, enter its address under Screens.")
+                Text("The bottom right corner shows the page number, as page of pages in that PDF (in a set: of the song).")
                 Text("◐ at the top right turns dark pages on or off on all screens: white paper turns black, notes keep their colours.")
                 Text("Notes: draw with a stylus; pick pen, marker or eraser in the bar at the bottom left, ↶ undoes. " +
                     "Without a stylus, tap the square finger button (green = on) to draw with a finger; taps on the page then no longer turn it. " +

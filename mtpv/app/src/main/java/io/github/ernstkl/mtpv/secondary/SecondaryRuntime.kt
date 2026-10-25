@@ -301,6 +301,8 @@ class SecondaryRuntime(private val app: MtpvApp) {
 
     fun render(fileId: String?, page: Int, w: Int, h: Int) = app.renderers.render(fileId, page, w, h)
 
+    fun pageCount(fileId: String) = app.renderers.pageCount(fileId)
+
     /** IPv4 addresses of this device, shown so the controller can be pointed here by hand. */
     fun addresses(): List<String> {
         val cm = app.getSystemService(ConnectivityManager::class.java)

@@ -566,6 +566,8 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     fun render(fileId: String?, page: Int, w: Int, h: Int) = app.renderers.render(fileId, page, w, h)
 
+    fun pageCount(fileId: String) = app.renderers.pageCount(fileId)
+
     // --- notes ---
 
     /** Notes drawn on the controller's own screen. */

@@ -136,7 +136,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                 }),
         ) {
             val own = st.ownTarget
-            PageView(own?.fileId, own?.page ?: 0, rt::render, dark = st.tools.dark) { fileId, page ->
+            PageView(own?.fileId, own?.page ?: 0, rt::render, rt::pageCount, dark = st.tools.dark) { fileId, page ->
                 // The notes of the song shown, once its page is drawn (two songs may share a PDF).
                 val notesKey = own?.notesKey?.takeIf { own.fileId == fileId && own.page == page }
                 if (notesKey != null) {
