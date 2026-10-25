@@ -2,6 +2,7 @@ package io.github.ernstkl.mtpv.secondary
 
 import io.github.ernstkl.mtpv.core.HashMismatchException
 import io.github.ernstkl.mtpv.core.NotesJson
+import io.github.ernstkl.mtpv.core.PagePosition
 import io.github.ernstkl.mtpv.core.PdfCache
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.net.Protocol
@@ -65,6 +66,8 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
                     fileId = body.optString("fileId").ifEmpty { null },
                     notesKey = body.optString("notesKey").ifEmpty { null },
                     page = body.optInt("page"),
+                    position = body.optInt("song").takeIf { it > 0 }
+                        ?.let { PagePosition(it, body.optInt("songs"), body.optInt("page"), body.optInt("pages")) },
                     notes = NotesJson.fromJson(body.optJSONArray("notes")),
                     notesRev = body.optLong("notesRev"),
                     savedRev = body.optLong("savedRev", -1),

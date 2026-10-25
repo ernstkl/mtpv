@@ -107,7 +107,8 @@ data class ControllerState(
     fun targetForSlot(slot: Int): Target? {
         val set = session.set ?: return null
         val last = set.songs.lastOrNull { !it.excluded } ?: set.songs.last()
-        return set.locate(pageForSlot(slot))?.let { Target(it.fileId, it.notesKey, it.page) } ?: Target(last.fileId, null, 0)
+        val page = pageForSlot(slot)
+        return set.locate(page)?.let { Target(it.fileId, it.notesKey, it.page, set.positionAt(page)) } ?: Target(last.fileId, null, 0)
     }
 
     /** Secondary that still holds unsaved notes of [key] and can be reached, if any. */
@@ -565,8 +566,6 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     fun render(fileId: String?, page: Int, w: Int, h: Int) = app.renderers.render(fileId, page, w, h)
-
-    fun pageCount(fileId: String) = app.renderers.pageCount(fileId)
 
     // --- notes ---
 

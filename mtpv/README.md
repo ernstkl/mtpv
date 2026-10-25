@@ -87,8 +87,8 @@ file from the folder, or changing its content, deletes its notes; renaming it ke
 **Copy notes from…** in the menu gives the song on the leftmost screen the notes of another song
 with exactly the same PDF, in any set (newest first, with set and date); they replace its own.
 
-Page numbers: the bottom right corner of every screen shows the page as "2 of 5", counted in the PDF on that
-screen (so in a set, within the song).
+Page numbers: the bottom right corner of every screen shows where its page is, as "song 2 of 7: page 1 of 3":
+the song among the songs shown in the set and the page within that song. A single PDF shows just "page 1 of 3".
 
 Dark pages: **◐** at the top right of any screen swaps light and dark on all screens, so white paper turns black.
 Colours keep their hue (red notes stay red); the marker tints the black paper instead of the white.

@@ -1,6 +1,7 @@
 package io.github.ernstkl.mtpv.controller
 
 import io.github.ernstkl.mtpv.core.NotesJson
+import io.github.ernstkl.mtpv.core.PagePosition
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.ToolSync
@@ -95,6 +96,7 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
         fileId: String?,
         notesKey: String?,
         page: Int,
+        position: PagePosition?,
         notes: List<Stroke>,
         notesRev: Long,
         savedRev: Long,
@@ -105,6 +107,9 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
             .put("fileId", fileId ?: "")
             .put("notesKey", notesKey ?: "")
             .put("page", page)
+            .put("song", position?.song ?: 0)
+            .put("songs", position?.songs ?: 0)
+            .put("pages", position?.pages ?: 0)
             .put("notes", NotesJson.toJson(notes))
             .put("notesRev", notesRev)
             .put("savedRev", savedRev)

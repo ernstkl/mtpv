@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import io.github.ernstkl.mtpv.core.LibraryEntry
+import io.github.ernstkl.mtpv.core.PagePosition
 import io.github.ernstkl.mtpv.core.Paging
 import io.github.ernstkl.mtpv.core.Song
 import io.github.ernstkl.mtpv.core.SongSet
@@ -36,8 +37,8 @@ data class ControllerSession(
     val known: Map<String, KnownSecondary>,
 )
 
-/** What a secondary shows. page 0 means blank. */
-data class DisplayState(val fileId: String?, val page: Int, val version: Long, val controller: String?)
+/** What a secondary shows, and where that page sits in the set. page 0 means blank. */
+data class DisplayState(val fileId: String?, val page: Int, val version: Long, val controller: String?, val position: PagePosition? = null)
 
 class Prefs(private val context: Context) {
     private val sp = context.getSharedPreferences("mtpv", Context.MODE_PRIVATE)
@@ -161,6 +162,9 @@ class Prefs(private val context: Context) {
         page = sp.getInt("displayPage", 0),
         version = sp.getLong("displayVersion", 0),
         controller = sp.getString("displayController", null),
+        position = sp.getInt("displaySong", 0).takeIf { it > 0 }?.let {
+            PagePosition(it, sp.getInt("displaySongs", 0), sp.getInt("displayPage", 0), sp.getInt("displayPages", 0))
+        },
     )
 
     fun saveDisplay(d: DisplayState) {
@@ -169,6 +173,9 @@ class Prefs(private val context: Context) {
             .putInt("displayPage", d.page)
             .putLong("displayVersion", d.version)
             .putString("displayController", d.controller)
+            .putInt("displaySong", d.position?.song ?: 0)
+            .putInt("displaySongs", d.position?.songs ?: 0)
+            .putInt("displayPages", d.position?.pages ?: 0)
             .apply()
     }
 }

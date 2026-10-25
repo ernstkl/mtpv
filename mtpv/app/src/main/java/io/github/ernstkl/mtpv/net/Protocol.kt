@@ -11,7 +11,8 @@ package io.github.ernstkl.mtpv.net
  *
  *   GET  /v1/files         {files: [id, ...]}
  *   PUT  /v1/files/{id}    raw PDF body; 409 hash_mismatch if the SHA-256 differs from {id}
- *   POST /v1/display       {controller, version, fileId, notesKey, page, notes, notesRev, savedRev} -> state;
+ *   POST /v1/display       {controller, version, fileId, notesKey, page, song, songs, pages, notes, notesRev,
+ *                          savedRev} -> state;
  *                          409 stale_version (with current version), 404 unknown_file,
  *                          409 notes_unsaved if the shown page has edits newer than savedRev
  *   GET  /v1/state         {fileId, page, version, controller, tool, fingers, dark}
@@ -29,7 +30,9 @@ package io.github.ernstkl.mtpv.net
  *
  * JSON request bodies larger than MAX_JSON_BODY (or with a negative Content-Length) get 413 too_large.
  *
- * Pages are 1-based; page 0 (or past the end) shows a blank screen.
+ * Pages are 1-based; page 0 (or past the end) shows a blank screen. song of songs (both 1-based) and
+ * pages place the page in the set: its song among the songs shown and the song's page count, for the
+ * label in the corner; all 0 with a blank page.
  *
  * Notes: the controller holds the authoritative copy and sends a page's strokes with the display
  * command. Notes belong to a song, not to the PDF: notesKey names the song's notes ("" with a blank

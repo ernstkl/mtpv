@@ -1,6 +1,7 @@
 package io.github.ernstkl.mtpv.controller
 
 import io.github.ernstkl.mtpv.core.NotesStore
+import io.github.ernstkl.mtpv.core.PagePosition
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.PdfCache
 import io.github.ernstkl.mtpv.core.ToolState
@@ -13,8 +14,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 
-/** What one secondary should show: a PDF's page and the key of its song's notes. page 0 is blank. */
-data class Target(val fileId: String?, val notesKey: String?, val page: Int)
+/**
+ * What one secondary should show: a PDF's page and the key of its song's notes, and where that page
+ * sits in the set. page 0 is blank, without a position.
+ */
+data class Target(val fileId: String?, val notesKey: String?, val page: Int, val position: PagePosition? = null)
 
 data class LinkStatus(
     val online: Boolean = false,
@@ -152,7 +156,7 @@ class SecondaryLink(
                     key?.let { notes.awaitFree(it, uuid) }
                     val page = key?.let { notes.load(it) }
                     val r = client.display(
-                        controllerId, versions.next(), fileId, key?.notesKey, want.page,
+                        controllerId, versions.next(), fileId, key?.notesKey, want.page, want.position,
                         page?.strokes.orEmpty(), page?.rev ?: 0, back.rev,
                     )
                     when (r) {

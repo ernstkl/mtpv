@@ -38,6 +38,17 @@ class SongSetTest {
     }
 
     @Test
+    fun positionCountsSongsShownAndPagesWithinTheSong() {
+        assertEquals(PagePosition(2, 3, 2, 3), set.positionAt(4))
+        assertEquals("song 2 of 3: page 2 of 3", set.positionAt(4)!!.label)
+        assertNull(set.positionAt(7))
+        // Without B, C is the second of two songs shown.
+        assertEquals("song 2 of 2: page 1 of 1", set.exclude(1, true).positionAt(3)!!.label)
+        val single = SongSet.of("x.pdf", listOf(Song("x.pdf", "x", "nx", 4)))
+        assertEquals("page 3 of 4", single.positionAt(3)!!.label)
+    }
+
+    @Test
     fun copiesOfOnePdfAreSongsOfTheirOwn() {
         val s = SongSet.of("Gig", listOf(Song("before.pdf", "x", "n1", 2), Song("after.pdf", "x", "n2", 2)))
         assertEquals(SongPage("x", "n2", 1), s.locate(3))

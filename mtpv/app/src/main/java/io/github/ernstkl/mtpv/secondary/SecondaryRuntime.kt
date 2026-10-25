@@ -12,6 +12,7 @@ import io.github.ernstkl.mtpv.controller.ControllerRuntime
 import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.NotesJson
 import io.github.ernstkl.mtpv.core.PageKey
+import io.github.ernstkl.mtpv.core.PagePosition
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.ToolSync
@@ -146,6 +147,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         fileId: String?,
         notesKey: String?,
         page: Int,
+        position: PagePosition?,
         notes: List<Stroke>,
         notesRev: Long,
         savedRev: Long,
@@ -163,7 +165,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         if (isWriting() || (shown.dirty && savedRev < shown.rev)) {
             return SecondaryServer.error(NanoHTTPD.Response.Status.CONFLICT, Protocol.ERR_NOTES_UNSAVED, null)
         }
-        val next = DisplayState(fileId, page, version, controller)
+        val next = DisplayState(fileId, page, version, controller, position)
         _display.value = next
         prefs.saveDisplay(next)
         setShownNotes(ShownNotes(fileId, notesKey, page, notesRev, shown.rev, dirty = false, strokes = notes))
@@ -300,8 +302,6 @@ class SecondaryRuntime(private val app: MtpvApp) {
     }
 
     fun render(fileId: String?, page: Int, w: Int, h: Int) = app.renderers.render(fileId, page, w, h)
-
-    fun pageCount(fileId: String) = app.renderers.pageCount(fileId)
 
     /** IPv4 addresses of this device, shown so the controller can be pointed here by hand. */
     fun addresses(): List<String> {

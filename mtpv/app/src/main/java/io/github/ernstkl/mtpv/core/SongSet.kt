@@ -14,6 +14,12 @@ data class SongPage(val fileId: String, val notesKey: String, val page: Int) {
     val key get() = PageKey(notesKey, page)
 }
 
+/** Where a page sits in its set: song [song] of the [songs] shown, page [page] of the song's [pages]. */
+data class PagePosition(val song: Int, val songs: Int, val page: Int, val pages: Int) {
+    /** "song 2 of 7: page 1 of 3"; just "page 1 of 3" in a set of one song (a single PDF). */
+    val label get() = (if (songs > 1) "song $song of $songs: " else "") + "page $page of $pages"
+}
+
 /**
  * Songs shown as one stream of pages, as if they were one PDF: page 1 is the first page of the
  * first song, and the pages of the next song follow right after the last page of the one before.
@@ -54,6 +60,12 @@ class SongSet private constructor(val name: String, val songs: List<Song>) {
     fun locate(page: Int): SongPage? {
         val i = songIndexAt(page)
         return if (i < 0) null else songs[i].let { SongPage(it.fileId, it.notesKey, page - firsts[i] + 1) }
+    }
+
+    /** Song and page within it shown at global [page], or null for a blank screen. */
+    fun positionAt(page: Int): PagePosition? {
+        val i = songIndexAt(page)
+        return if (i < 0) null else PagePosition(numberOf(i), shownSongs, page - firsts[i] + 1, songs[i].pageCount)
     }
 
     /** Global page that shows [key], or 0 if the set does not contain it (or leaves its song out). */
