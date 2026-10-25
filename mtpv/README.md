@@ -98,7 +98,8 @@ the song among the songs shown in the set and the page within that song. A singl
 
 Dark pages: **◐** at the top right of any screen swaps light and dark on all screens, so white paper turns black.
 Colours keep their hue (red notes stay red); the marker tints the black paper instead of the white.
-The setting is kept across restarts. PdfRenderer has no dark mode, so the page is drawn through a colour matrix.
+The setting is kept across restarts. PdfRenderer has no dark mode, so the rendered page is inverted in linear light
+(not in sRGB values), which keeps thin lines such as staves and stems as strong as on paper.
 
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
 On a secondary, tap the middle of the screen (or ☰ top left) for its address, paired controllers and **Device role**.

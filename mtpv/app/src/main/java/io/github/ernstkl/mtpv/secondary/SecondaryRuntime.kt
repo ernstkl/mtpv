@@ -301,7 +301,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         cache.evict(setOfNotNull(id, _display.value.fileId))
     }
 
-    fun render(fileId: String?, page: Int, w: Int, h: Int) = app.renderers.render(fileId, page, w, h)
+    fun render(fileId: String?, page: Int, w: Int, h: Int, dark: Boolean) = app.renderers.render(fileId, page, w, h, dark)
 
     /** IPv4 addresses of this device, shown so the controller can be pointed here by hand. */
     fun addresses(): List<String> {

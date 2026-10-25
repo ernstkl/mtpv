@@ -573,7 +573,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         }
     }
 
-    fun render(fileId: String?, page: Int, w: Int, h: Int) = app.renderers.render(fileId, page, w, h)
+    fun render(fileId: String?, page: Int, w: Int, h: Int, dark: Boolean) = app.renderers.render(fileId, page, w, h, dark)
 
     // --- notes ---
 

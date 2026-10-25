@@ -15,9 +15,12 @@ class PageRenderer(file: File) : AutoCloseable {
 
     val pageCount: Int = renderer.pageCount
 
-    /** Renders 1-based [page] to fit inside [maxW] x [maxH], or returns null for a blank screen. */
+    /**
+     * Renders 1-based [page] to fit inside [maxW] x [maxH], or returns null for a blank screen.
+     * [dark] swaps light and dark ([DarkPages]).
+     */
     @Synchronized
-    fun render(page: Int, maxW: Int, maxH: Int): Bitmap? {
+    fun render(page: Int, maxW: Int, maxH: Int, dark: Boolean = false): Bitmap? {
         if (closed || page !in 1..pageCount || maxW <= 0 || maxH <= 0) return null
         renderer.openPage(page - 1).use { p ->
             val scale = min(maxW / p.width.toFloat(), maxH / p.height.toFloat())
@@ -26,6 +29,12 @@ class PageRenderer(file: File) : AutoCloseable {
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             bmp.eraseColor(Color.WHITE)
             p.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            if (dark) {
+                val px = IntArray(w * h)
+                bmp.getPixels(px, 0, w, 0, 0, w, h)
+                DarkPages.invert(px)
+                bmp.setPixels(px, 0, w, 0, 0, w, h)
+            }
             return bmp
         }
     }
@@ -55,6 +64,6 @@ class RendererHolder(private val cache: PdfCache) {
 
     /** Synchronized so that a [get] for another file cannot close the renderer between lookup and render. */
     @Synchronized
-    fun render(fileId: String?, page: Int, maxW: Int, maxH: Int): Bitmap? =
-        fileId?.let { get(it) }?.render(page, maxW, maxH)
+    fun render(fileId: String?, page: Int, maxW: Int, maxH: Int, dark: Boolean): Bitmap? =
+        fileId?.let { get(it) }?.render(page, maxW, maxH, dark)
 }

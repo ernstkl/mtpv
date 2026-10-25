@@ -88,6 +88,23 @@ class DarkPagesTest {
     }
 
     @Test
+    fun grayIsInvertedInLinearLight() {
+        // A half-covered edge pixel of a black line (sRGB 128) turns as bright as it was dark, not sRGB 127.
+        assertEquals(Triple(229, 229, 229), rgb(DarkPages.pen(0xFF808080.toInt())))
+        // Lighter grays turn darker, never the other way round.
+        val out = (0..255).map { rgb(DarkPages.pen(0xFF000000.toInt() or (it * 0x010101))).first }
+        assertEquals(out.sortedDescending(), out)
+    }
+
+    @Test
+    fun invertKeepsAlpha() {
+        val px = intArrayOf(0xFFFFFFFF.toInt(), 0x80000000.toInt())
+        DarkPages.invert(px)
+        assertEquals(0xFF000000.toInt(), px[0])
+        assertEquals(0x80FFFFFF.toInt(), px[1])
+    }
+
+    @Test
     fun pensKeepTheirHueAndGetLighter() {
         val (r, g, b) = rgb(DarkPages.pen(NoteTool.PEN_RED.color.toInt()))
         assertTrue(r > g + 60 && r > b + 60 && g > 0x2F)
