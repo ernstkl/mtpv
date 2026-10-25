@@ -28,6 +28,10 @@ class MtpvApp : Application() {
     private val _role = MutableStateFlow(Role.NONE)
     val role: StateFlow<Role> = _role
 
+    /** Changes with every new runtime, so the UI picks up the new one even if the role stays. */
+    private val _generation = MutableStateFlow(0)
+    val generation: StateFlow<Int> = _generation
+
     override fun onCreate() {
         super.onCreate()
         prefs = Prefs(this)
@@ -48,5 +52,23 @@ class MtpvApp : Application() {
             Role.NONE -> Unit
         }
         _role.value = role
+        _generation.value++
+    }
+
+    /**
+     * Stops the controller, runs [replace] (main thread) to change its stored data, and starts a new
+     * controller that reads it afresh. Returns the new controller.
+     */
+    fun restartController(replace: () -> Unit): ControllerRuntime? {
+        if (_role.value != Role.CONTROLLER) return null
+        controller?.stop()
+        controller = null
+        try {
+            replace()
+        } finally {
+            controller = ControllerRuntime(this).also { it.start() }
+            _generation.value++
+        }
+        return controller
     }
 }

@@ -45,7 +45,7 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    controller can be in any position) and lets you add a secondary by IP if mDNS is blocked.
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
    Then **Open single PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
-   For a song set, collect one PDF per song in a folder below the **Library folder** (in the menu; folders in
+   For a song set, collect one PDF per song in a folder below the **Library folder** (in the menu under **Library**; folders in
    folders are fine, such as Gigs / 2026 / May) and pick it under **Open set from library…**: the PDFs follow each
    other like one long PDF, in alphabetical order (numbers by value, so "2" comes before "10"). Opening
    the same folder again keeps its order; files added since go to the end, removed ones drop out.
@@ -62,6 +62,12 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    A renamed file keeps its place, tick and notes. If the library moves (say from the SD card to
    internal storage), pick it again under **Library folder**: each set found at the same place in it
    keeps its order, ticks and notes.
+   **Library → Export all data…** saves the notes, song order and ticks of all sets, and the note tool
+   and dark pages setting, to one zip file (it first fetches unsaved notes from the secondaries). Not the
+   PDFs: they stay in the library. **Import all data…** replaces all of them on this device by those in
+   such a file, after asking. To move to another install (a new tablet, or the F-Droid build, which needs
+   uninstalling first): export, install, import, then pick the library folder again; each set then gets
+   its order, ticks and notes back. Paired screens are not in the file: pair them again.
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.

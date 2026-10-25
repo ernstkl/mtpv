@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,6 +65,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize()) {
                     val role by app.role.collectAsStateWithLifecycle()
+                    val generation by app.generation.collectAsStateWithLifecycle()
                     // The role keeps running while another one is being chosen; back or Cancel keeps it.
                     var choosing by remember { mutableStateOf(false) }
                     if (role == Role.NONE || choosing) {
@@ -72,10 +74,12 @@ class MainActivity : ComponentActivity() {
                             if (it != role) app.setRole(it)
                         }
                     } else {
-                        when (role) {
-                            Role.CONTROLLER -> app.controller?.let { ControllerScreen(it) { choosing = true } }
-                            Role.SECONDARY -> app.secondary?.let { SecondaryScreen(it) { choosing = true } }
-                            Role.NONE -> Unit
+                        key(generation) {
+                            when (role) {
+                                Role.CONTROLLER -> app.controller?.let { ControllerScreen(it) { choosing = true } }
+                                Role.SECONDARY -> app.secondary?.let { SecondaryScreen(it) { choosing = true } }
+                                Role.NONE -> Unit
+                            }
                         }
                     }
                 }

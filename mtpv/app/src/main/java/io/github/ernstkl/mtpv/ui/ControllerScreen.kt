@@ -72,6 +72,8 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     var showSongs by remember { mutableStateOf(false) }
     var showSets by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var showLibrary by remember { mutableStateOf(st.library == null) }
+    var confirmImport by remember { mutableStateOf(false) }
     val changes by rt.notesChanges.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(rt::openPdf)
@@ -81,6 +83,12 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     }
     val libraryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let(rt::setLibrary)
+    }
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        uri?.let(rt::exportData)
+    }
+    val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(rt::importData)
     }
     /** Closes the drawer, then does [action]. */
     fun menu(action: () -> Unit) {
@@ -117,7 +125,16 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     MenuItem("Screens (${s.arrangement.size})") { menu { showScreens = true } }
                     MenuItem("Device role", "Controller") { menu(onLeaveRole) }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    MenuItem("Library folder", st.library?.name ?: "Not chosen yet") { menu { libraryPicker.launch(null) } }
+                    MenuGroup("Library", showLibrary) { showLibrary = !showLibrary }
+                    if (showLibrary) {
+                        MenuItem("Library folder", st.library?.name ?: "Not chosen yet", indent = true) { menu { libraryPicker.launch(null) } }
+                        MenuItem("Export all data…", "Notes, song order and ticks, to one file", indent = true) {
+                            menu { exportPicker.launch(rt.backupName()) }
+                        }
+                        MenuItem("Import all data…", "Replaces them with a file from Export", indent = true) {
+                            menu { confirmImport = true }
+                        }
+                    }
                     MenuItem("About") { menu { showAbout = true } }
                 }
             }
@@ -182,6 +199,24 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     if (showSets) SetsDialog(rt, st, onChooseLibrary = { libraryPicker.launch(null) }) { showSets = false }
     if (showSongs) SongsDialog(rt, st) { showSongs = false }
     if (showAbout) AboutDialog { showAbout = false }
+    if (confirmImport) {
+        AlertDialog(
+            onDismissRequest = { confirmImport = false },
+            title = { Text("Import all data?") },
+            text = {
+                Text("The notes, song order and ticks of all sets on this device are replaced by those in the file " +
+                    "you pick next. Export first if you want to keep them.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmImport = false
+                    // Some file managers show zip files as application/octet-stream.
+                    importPicker.launch(arrayOf("application/zip", "application/octet-stream"))
+                }) { Text("Choose file") }
+            },
+            dismissButton = { TextButton(onClick = { confirmImport = false }) { Text("Cancel") } },
+        )
+    }
     st.copyNotes?.let { CopyNotesDialog(it, rt::copyNotes, rt::closeCopyNotes) }
 
     st.pairing?.let { p ->
@@ -212,9 +247,21 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     }
 }
 
-/** A drawer item, with an optional second line. */
+/** A drawer item that opens or closes the items of its group below it. */
 @Composable
-private fun MenuItem(label: String, subtitle: String? = null, onClick: () -> Unit) {
+private fun MenuGroup(label: String, open: Boolean, onClick: () -> Unit) {
+    NavigationDrawerItem(
+        label = { Text(label) },
+        badge = { Text(if (open) "▾" else "▸") },
+        selected = false,
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 12.dp),
+    )
+}
+
+/** A drawer item, with an optional second line; [indent] for one in a [MenuGroup]. */
+@Composable
+private fun MenuItem(label: String, subtitle: String? = null, indent: Boolean = false, onClick: () -> Unit) {
     NavigationDrawerItem(
         label = {
             Column {
@@ -224,7 +271,7 @@ private fun MenuItem(label: String, subtitle: String? = null, onClick: () -> Uni
         },
         selected = false,
         onClick = onClick,
-        modifier = Modifier.padding(horizontal = 12.dp),
+        modifier = Modifier.padding(start = if (indent) 28.dp else 12.dp, end = 12.dp),
     )
 }
 

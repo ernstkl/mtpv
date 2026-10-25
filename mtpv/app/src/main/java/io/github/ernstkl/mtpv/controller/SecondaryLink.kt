@@ -9,10 +9,13 @@ import io.github.ernstkl.mtpv.net.Endpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * What one secondary should show: a PDF's page and the key of its song's notes, and where that page
@@ -69,6 +72,9 @@ class SecondaryLink(
     /** The endpoint whose identity has been checked; null while offline. */
     @Volatile private var verified: Endpoint? = null
     private val wake = Channel<Unit>(Channel.CONFLATED)
+    /** Flushes asked for and done so far, see [flush]. */
+    private val flushWanted = AtomicLong(0)
+    private val flushDone = MutableStateFlow(0L)
 
     fun setTarget(t: Target?) {
         if (t == target) return
@@ -86,6 +92,16 @@ class SecondaryLink(
     fun bringToFront() {
         frontAt = System.currentTimeMillis()
         wake.trySend(Unit)
+    }
+
+    /**
+     * Fetches and saves the notes on the secondary's page now, by sending that page again: the
+     * secondary has no unsaved notes afterwards. Returns once done; waits while it is offline.
+     */
+    suspend fun flush() {
+        val n = flushWanted.incrementAndGet()
+        wake.trySend(Unit)
+        flushDone.first { it >= n }
     }
 
     fun setToken(t: String?) {
@@ -140,6 +156,10 @@ class SecondaryLink(
                     publish(LinkStatus(online = true))
                 }
                 val want = target
+                val flushTo = flushWanted.get()
+                if (flushTo > flushDone.value) {
+                    if (want == null) flushDone.value = flushTo else applied = null
+                }
                 if (want != null && want != applied) {
                     val fileId = want.fileId
                     if (fileId != null && fileId !in files) {
@@ -163,6 +183,7 @@ class SecondaryLink(
                         SecondaryClient.DisplayResult.Ok -> {
                             applied = want
                             notes.hold(uuid, key)
+                            flushDone.value = maxOf(flushDone.value, flushTo)
                         }
                         is SecondaryClient.DisplayResult.Stale -> versions.bumpTo(r.currentVersion)
                         SecondaryClient.DisplayResult.UnknownFile -> files = files - fileId.orEmpty()

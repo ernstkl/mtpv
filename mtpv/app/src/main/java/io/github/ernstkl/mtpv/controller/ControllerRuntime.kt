@@ -3,10 +3,12 @@ package io.github.ernstkl.mtpv.controller
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import io.github.ernstkl.mtpv.BuildConfig
 import io.github.ernstkl.mtpv.ControllerSession
 import io.github.ernstkl.mtpv.FrontNotification
 import io.github.ernstkl.mtpv.KnownSecondary
 import io.github.ernstkl.mtpv.MtpvApp
+import io.github.ernstkl.mtpv.core.Backup
 import io.github.ernstkl.mtpv.core.FolderFile
 import io.github.ernstkl.mtpv.core.LibraryEntry
 import io.github.ernstkl.mtpv.core.LibraryLevel
@@ -35,7 +37,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,7 +50,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
+import java.io.File
 import java.io.IOException
+import java.time.LocalDate
 
 /** A pairing in progress: [code] is shown here and on the secondary, where someone taps Allow. */
 data class PairingUi(val uuid: String, val name: String, val code: String?)
@@ -652,6 +660,101 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         links.values.forEach { it.first.setTools(t) }
     }
 
+    // --- export and import all app data ---
+
+    /** File name offered for Export. */
+    fun backupName(): String = "mtpv-backup-${LocalDate.now()}.zip"
+
+    /** Writes notes, set records and settings to [uri] ([Backup]), after fetching unsaved notes from the screens. */
+    fun exportData(uri: Uri) {
+        scope.launch(orderWrites) {
+            try {
+                val missed = flushSecondaries()
+                _state.update { it.copy(busy = "Writing backup…") }
+                val manifest = JSONObject()
+                    .put("format", Backup.FORMAT)
+                    .put("app", BuildConfig.VERSION_NAME)
+                    .put("commit", BuildConfig.GIT_COMMIT ?: "")
+                    .put("created", System.currentTimeMillis())
+                    .put("device", prefs.deviceName)
+                val settings = JSONObject().put("tools", ToolSync.toJson(_state.value.tools))
+                val summary = app.contentResolver.openOutputStream(uri, "w")?.use {
+                    Backup.write(it, app.filesDir, manifest.toString(), settings.toString())
+                } ?: throw IOException("cannot write the file")
+                showMessage("Exported the notes of ${count(summary.songs, "song")} and ${count(summary.sets, "set")}." + missedNote(missed))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                showMessage("Export failed: ${e.message}")
+            } finally {
+                _state.update { it.copy(busy = null) }
+            }
+        }
+    }
+
+    /**
+     * Replaces notes, set records and settings by those in the backup at [uri]. The controller then
+     * starts afresh, without an open set: opening a set from the library finds its order, ticks and notes.
+     */
+    fun importData(uri: Uri) {
+        scope.launch(orderWrites) {
+            val staging = File(app.filesDir, "import.tmp")
+            try {
+                _state.update { it.copy(busy = "Reading backup…") }
+                val u = app.contentResolver.openInputStream(uri)?.use { Backup.unpack(it, staging) }
+                    ?: throw IOException("cannot read the file")
+                val format = runCatching { JSONObject(u.manifest).getInt("format") }.getOrNull()
+                if (format != Backup.FORMAT) {
+                    throw Backup.BadBackupException(
+                        if (format != null && format > Backup.FORMAT) "it was made by a newer MTPV; update MTPV first" else "not an MTPV backup"
+                    )
+                }
+                val tools = u.settings?.let { s -> runCatching { ToolSync.fromJson(JSONObject(s).getJSONObject("tools")) }.getOrNull() }
+                // The secondaries hand in their unsaved notes now, so none turn up later among the imported ones.
+                flushSecondaries()
+                val next = if (prefs.library == null) {
+                    "Now choose the Library folder (in the menu, under Library): its sets get their order, ticks and notes back."
+                } else {
+                    "Open a set from the library: it gets its order, ticks and notes back."
+                }
+                withContext(Dispatchers.Main) {
+                    app.restartController {
+                        Backup.replace(app.filesDir, staging)
+                        tools?.let { prefs.tools = it }
+                        prefs.saveSession(prefs.loadSession().copy(set = null, folder = null, start = 1))
+                    }?.showMessage("Imported the notes of ${count(u.summary.songs, "song")} and ${count(u.summary.sets, "set")}. $next")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                showMessage("Import failed: ${e.message}. Nothing was changed.")
+            } finally {
+                _state.update { it.copy(busy = null) }
+                staging.deleteRecursively()
+            }
+        }
+    }
+
+    /**
+     * Fetches unsaved notes from every secondary in the arrangement. Returns the names of those not
+     * reached in time: notes still unsaved on them are missed.
+     */
+    private suspend fun flushSecondaries(): List<String> {
+        _state.update { it.copy(busy = "Fetching notes from the screens…") }
+        val all = withContext(Dispatchers.Main) { links.mapValues { it.value.first } }
+        val known = _state.value.session.known
+        return coroutineScope {
+            all.map { (uuid, link) ->
+                async { uuid.takeIf { withTimeoutOrNull(FLUSH_TIMEOUT_MS) { link.flush() } == null } }
+            }.awaitAll().filterNotNull().map { known[it]?.name ?: it.take(4) }
+        }
+    }
+
+    private fun missedNote(missed: List<String>) =
+        if (missed.isEmpty()) "" else " Not reached: ${missed.joinToString()}; notes not yet saved from there are missing."
+
+    private fun count(n: Int, what: String) = if (n == 1) "1 $what" else "$n ${what}s"
+
     // --- bring MTPV to the front on every screen ---
 
     /** MTPV came (back) to the front here or on secondary [from]: the other screens follow (main thread). */
@@ -662,7 +765,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     fun clearMessage() = _state.update { it.copy(message = null) }
 
-    private fun showMessage(m: String) = _state.update { it.copy(message = m) }
+    fun showMessage(m: String) = _state.update { it.copy(message = m) }
 
     // --- plumbing ---
 
@@ -719,6 +822,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     companion object {
         private const val PAIR_TIMEOUT_MS = 60_000L
+        private const val FLUSH_TIMEOUT_MS = 5_000L
         const val FRONT_EVENT = "front"
     }
 }
