@@ -23,6 +23,9 @@ key once and keep it safe (updates must be signed with the same key), then put i
     keyAlias=mtpv
     keyPassword=…
 
+Both passwords are the one you chose when `keytool` asked for it (it asks only once, since the key in a
+PKCS12 keystore shares the store password).
+
 `./gradlew assembleRelease` then writes `app/build/outputs/apk/release/app-release.apk`. Without
 `keystore.properties` it writes `app-release-unsigned.apk`, which F-Droid signs itself.
 
