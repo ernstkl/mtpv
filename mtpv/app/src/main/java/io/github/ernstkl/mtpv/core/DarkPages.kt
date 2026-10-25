@@ -18,6 +18,18 @@ object DarkPages {
     private val INVERT = IntArray(256) { toSrgb(1 - toLinear(it / 255.0)) }
 
     /**
+     * Paper turns very dark gray, not black, and black notes off-white, not white: bright thin
+     * lines on pure black blur for many eyes (halation). Every result is squeezed into PAPER..INK.
+     */
+    const val PAPER = 0x1E
+    const val INK = 0xEB
+
+    private fun squeeze(v: Float) = PAPER + v * (INK - PAPER) / 255
+
+    /** Grays from [INVERT], squeezed. */
+    private val GRAY = IntArray(256) { squeeze(INVERT[it].toFloat()).roundToInt() * 0x010101 }
+
+    /**
      * Turns the hue by 180° (the luminance-keeping rotation of SVG's feHueRotate), so after the
      * inversion the hue comes back to where it was. A 3x3 matrix, row by row; grays stay as they are.
      */
@@ -38,15 +50,15 @@ object DarkPages {
         val b = argb and 0xFF
         val alpha = argb and 0xFF000000.toInt()
         // Grays, nearly all of a page of sheet music, need neither the blend nor the hue rotation.
-        if (r == g && g == b) return alpha or (INVERT[r] * 0x010101)
+        if (r == g && g == b) return alpha or GRAY[r]
         val max = maxOf(r, g, b)
         val saturation = (max - minOf(r, g, b)) / max.toFloat()
         fun channel(v: Int) = INVERT[v] + (255 - v - INVERT[v]) * saturation
         val cr = channel(r)
         val cg = channel(g)
         val cb = channel(b)
-        fun row(i: Int) = (HUE_180[3 * i] * cr + HUE_180[3 * i + 1] * cg + HUE_180[3 * i + 2] * cb)
-            .roundToInt().coerceIn(0, 255)
+        fun row(i: Int) = squeeze((HUE_180[3 * i] * cr + HUE_180[3 * i + 1] * cg + HUE_180[3 * i + 2] * cb).coerceIn(0f, 255f))
+            .roundToInt()
         return alpha or (row(0) shl 16) or (row(1) shl 8) or row(2)
     }
 

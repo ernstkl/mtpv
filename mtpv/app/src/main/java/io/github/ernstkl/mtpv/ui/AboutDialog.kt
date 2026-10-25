@@ -50,7 +50,7 @@ private val Sections = listOf(
                 "Secondary: tap the middle or ☰ for its address and settings.",
             "The bottom right corner shows where the page is: \"song 2 of 7: page 1 of 3\", " +
                 "the page counted within its song (just \"page 1 of 3\" for a single PDF).",
-            "◐ at the top right turns dark pages on or off on all screens: white paper turns black, notes keep their colours.",
+            "◐ at the top right turns dark pages on or off on all screens: white paper turns dark gray, notes light, colours stay.",
             "When MTPV comes back to the front on one screen, the screens showing another app " +
                 "get a notification; tap it to bring MTPV back there too.",
         ),

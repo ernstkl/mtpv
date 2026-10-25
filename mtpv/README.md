@@ -96,7 +96,8 @@ with exactly the same PDF, in any set (newest first, with set and date); they re
 Page numbers: the bottom right corner of every screen shows where its page is, as "song 2 of 7: page 1 of 3":
 the song among the songs shown in the set and the page within that song. A single PDF shows just "page 1 of 3".
 
-Dark pages: **◐** at the top right of any screen swaps light and dark on all screens, so white paper turns black.
+Dark pages: **◐** at the top right of any screen swaps light and dark on all screens: white paper turns very dark gray, black notes off-white
+(softer than pure black and white, which makes thin lines blur for many eyes).
 Colours keep their hue (red notes stay red); the marker tints the black paper instead of the white.
 The setting is kept across restarts. PdfRenderer has no dark mode, so the rendered page is inverted in linear light
 (not in sRGB values), which keeps thin lines such as staves and stems as strong as on paper.

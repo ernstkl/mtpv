@@ -82,15 +82,16 @@ class DarkPagesTest {
     private fun rgb(c: Int) = Triple(c ushr 16 and 0xFF, c ushr 8 and 0xFF, c and 0xFF)
 
     @Test
-    fun whiteAndBlackSwap() {
-        assertEquals(0xFF000000.toInt(), DarkPages.pen(0xFFFFFFFF.toInt()))
-        assertEquals(0xFFFFFFFF.toInt(), DarkPages.pen(0xFF000000.toInt()))
+    fun whiteAndBlackSwapIntoDarkGrayAndOffWhite() {
+        assertEquals(0xFF1E1E1E.toInt(), DarkPages.pen(0xFFFFFFFF.toInt()))
+        assertEquals(0xFFEBEBEB.toInt(), DarkPages.pen(0xFF000000.toInt()))
     }
 
     @Test
     fun grayIsInvertedInLinearLight() {
-        // A half-covered edge pixel of a black line (sRGB 128) turns as bright as it was dark, not sRGB 127.
-        assertEquals(Triple(229, 229, 229), rgb(DarkPages.pen(0xFF808080.toInt())))
+        // A half-covered edge pixel of a black line (sRGB 128) turns as bright as it was dark: 229 of
+        // 255, squeezed to 214, not sRGB 127.
+        assertEquals(Triple(214, 214, 214), rgb(DarkPages.pen(0xFF808080.toInt())))
         // Lighter grays turn darker, never the other way round.
         val out = (0..255).map { rgb(DarkPages.pen(0xFF000000.toInt() or (it * 0x010101))).first }
         assertEquals(out.sortedDescending(), out)
@@ -100,8 +101,8 @@ class DarkPagesTest {
     fun invertKeepsAlpha() {
         val px = intArrayOf(0xFFFFFFFF.toInt(), 0x80000000.toInt())
         DarkPages.invert(px)
-        assertEquals(0xFF000000.toInt(), px[0])
-        assertEquals(0x80FFFFFF.toInt(), px[1])
+        assertEquals(0xFF1E1E1E.toInt(), px[0])
+        assertEquals(0x80EBEBEB.toInt(), px[1])
     }
 
     @Test
