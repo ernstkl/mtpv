@@ -77,10 +77,12 @@ undone). Without a stylus, tap the square finger switch at the left of the bar (
 finger then draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
 Tool and finger switch are the same on all screens, like one big sheet of paper: what you pick on
 one screen is picked on all of them. The stylus draws on every screen whatever the switch says.
-Notes belong to a song, a PDF in a set: a copy of the PDF in another set, or under another name in
-the same set, has notes of its own. Deleting a file from the folder, or changing its content, deletes
-its notes; renaming it keeps them. When a new song's PDF already has notes elsewhere, opening the set
-asks once whether it starts with a copy of them (the newest ones, with where they come from).
+Notes belong to the set, not to the PDF: the folder is only what MTPV reads, and MTPV never writes
+to it. Order, ticks and notes are kept in the app, so a copy of the PDF in another set, or under
+another name in the same set, has notes of its own, and a new set starts without notes. Deleting a
+file from the folder, or changing its content, deletes its notes; renaming it keeps them.
+**Copy notes from…** in the menu gives the song on the leftmost screen the notes of another song
+with exactly the same PDF, in any set (newest first, with set and date); they replace its own.
 
 Dark pages: **◐** at the top right of any screen swaps light and dark on all screens, so white paper turns black.
 Colours keep their hue (red notes stay red); the marker tints the black paper instead of the white.

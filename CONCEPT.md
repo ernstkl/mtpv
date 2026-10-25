@@ -28,6 +28,31 @@ up to the last page. A page turn on any screen moves *start* by one, so every sc
                                                 └─────────────┘
 ```
 
+## A set is a view on a folder
+
+The folder of PDFs (the set's base folder) is **input** to the app, nothing more. MTPV reads it,
+copies the PDFs into its own storage and never writes to it. A set is MTPV's view on that folder:
+it adds what the plain list of files lacks, and keeps all of it in app storage:
+
+- the order of the songs,
+- whether each song is shown or left out,
+- the notes. They belong to the set, not to the PDF, because they can depend on the context a
+  song is played in ("guitar plays the intro"). They are also tied to the PDF's exact content.
+
+Rules that follow from this:
+
+- A file renamed in the folder is the same song: it keeps its place, tick and notes.
+- A file that leaves the folder, or whose content changes, takes everything the set added to it
+  with it, notes included.
+- A new set starts without notes, even if its PDFs have notes in other sets. Notes reach a song
+  only by an explicit act: **Copy notes from…** on that song (from any song with exactly the same
+  PDF), or, later, a PDF with notes embedded by MTPV put into the folder (`TODO.md`, 1 and 2).
+- When the library moves, a set follows its folder (same place below the library folder, most
+  files still there): it is the same view on the same folder.
+
+The PDF does not carry the notes, and the app should not pretend it does: copying a PDF to
+another folder copies the input, not the set. User texts (README, About) say so plainly.
+
 ## Building blocks
 
 | Package | Role |
@@ -60,7 +85,8 @@ up to the last page. A page turn on any screen moves *start* by one, so every sc
 - **Notes per song.** Notes belong to a song (a file name in a set), keyed by the set ID and a random
   notes ID, so copies of one PDF have notes of their own. A display command names the PDF to render
   and, separately, the song's notes key. A song's notes follow a rename and are deleted when its file
-  leaves the folder or changes; a new song may start with a copy of another song's notes for the same hash.
+  leaves the folder or changes. A song gets another song's notes only through Copy notes from…,
+  which gives it a new notes ID: its old notes are deleted, so late edits to them are dropped.
 - **Single owner for notes.** The controller holds the authoritative copy of all notes. A secondary
   edits only the page it shows; the controller fetches those edits before it gives that secondary
   another page. Strokes are vectors in page-relative coordinates, independent of screen size.

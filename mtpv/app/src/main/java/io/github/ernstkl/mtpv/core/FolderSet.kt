@@ -114,3 +114,20 @@ object SetAdoption {
             .maxByOrNull { it.second }?.first
     }
 }
+
+/** A song whose notes another song with the same PDF can copy: song [name] of set [set]. */
+data class NotesSource(val set: String, val name: String, val notesKey: String)
+
+/**
+ * A new set starts without notes; a song gets those of another song only when asked to, from any
+ * set, the same one included, whose PDF has exactly the same content.
+ */
+object NotesSources {
+    /** The songs in [records] whose PDF is [fileId], except the one with notes [except]. */
+    fun of(records: List<SetRecord>, fileId: String, except: String): List<NotesSource> =
+        records.flatMap { r ->
+            r.songs.filter { (_, e) -> e.fileId == fileId }.keys
+                .map { NotesSource(r.name, it, r.notesKey(it)!!) }
+                .filter { it.notesKey != except }
+        }
+}

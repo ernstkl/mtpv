@@ -138,6 +138,22 @@ class SetAdoptionTest {
     }
 }
 
+class NotesSourcesTest {
+    private fun record(id: String, vararg songs: Pair<String, String>) =
+        SetRecord(id, "uri-$id", "Set $id", emptyList(), emptyList(), songs = songs.associate { (n, h) -> n to SongEntry(h, "n-$n") })
+
+    @Test
+    fun sameContentInAnySetButNotTheSongItself() {
+        val a = record("a", "Song.pdf" to "h1", "Copy.pdf" to "h1", "Other.pdf" to "h2")
+        val b = record("b", "Song (1).pdf" to "h1")
+        val sources = NotesSources.of(listOf(a, b), "h1", a.notesKey("Song.pdf")!!)
+        assertEquals(
+            listOf(NotesSource("Set a", "Copy.pdf", "a/n-Copy.pdf"), NotesSource("Set b", "Song (1).pdf", "b/n-Song (1).pdf")),
+            sources,
+        )
+    }
+}
+
 class NotesKeyTest {
     @Test
     fun keysAreTwoRandomIds() {

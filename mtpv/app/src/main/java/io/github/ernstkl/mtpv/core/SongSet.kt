@@ -67,6 +67,10 @@ class SongSet private constructor(val name: String, val songs: List<Song>) {
     fun exclude(index: Int, excluded: Boolean): SongSet =
         SongSet(name, songs.mapIndexed { i, s -> if (i == index) s.copy(excluded = excluded) else s })
 
+    /** The same set with the song whose notes are [from] taking notes [to]. */
+    fun withNotesKey(from: String, to: String): SongSet =
+        SongSet(name, songs.map { if (it.notesKey == from) it.copy(notesKey = to) else it })
+
     override fun equals(other: Any?) = other is SongSet && name == other.name && songs == other.songs
 
     override fun hashCode() = name.hashCode() * 31 + songs.hashCode()

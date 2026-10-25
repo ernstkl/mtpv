@@ -13,6 +13,8 @@ import io.github.ernstkl.mtpv.core.LibraryLevel
 import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.NotesKey
+import io.github.ernstkl.mtpv.core.NotesSource
+import io.github.ernstkl.mtpv.core.NotesSources
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.PageRenderer
@@ -29,7 +31,6 @@ import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.moved
 import io.github.ernstkl.mtpv.net.Endpoint
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,14 +68,13 @@ data class LibraryUi(
     val showsOpenSet get() = openPath.isNotEmpty() && path.lastOrNull()?.documentId == openPath.last()
 }
 
-/** Notes of another song that new song [name] can start with: song [file] of set [set], last changed at [changed]. */
-data class NotesOffer(val name: String, val set: String, val file: String, val notesKey: String, val changed: Long)
-
-/**
- * New songs of set [set] whose PDF has notes elsewhere. [answer] gets the names of the songs that
- * start with a copy of those notes, or null to not open the set after all.
- */
-data class NotesOfferUi(val set: String, val offers: List<NotesOffer>, val answer: CompletableDeferred<Set<String>?>)
+/** Notes the song [song] can copy: [sources] with the same PDF, newest first, each with its last change. */
+data class CopyNotesUi(
+    val song: String,
+    val notesKey: String,
+    val hasNotes: Boolean,
+    val sources: List<Pair<NotesSource, Long>>,
+)
 
 data class ControllerState(
     val session: ControllerSession,
@@ -88,7 +88,8 @@ data class ControllerState(
     val pairing: PairingUi? = null,
     /** Null until a library folder is chosen. */
     val library: LibraryUi? = null,
-    val notesOffer: NotesOfferUi? = null,
+    /** Copy notes from…, while it is open. */
+    val copyNotes: CopyNotesUi? = null,
     val busy: String? = null,
     val message: String? = null,
 ) {
@@ -185,7 +186,6 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 if (count == 0) error("the PDF has no pages")
                 val stored = StoredFile(FolderFile(name, uri.toString(), -1, 0), id, count)
                 val record = updateRecord(uri, name, folders.load(uri), listOf(stored), mapOf(name to id), path = null)
-                    ?: return@launch
                 val set = SongSet.of(name, listOf(Song(name, id, record.notesKey(name)!!, count)))
                 withContext(Dispatchers.Main) {
                     updateSession { it.copy(set = set, folder = null, start = 1) }
@@ -275,7 +275,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             old?.unchanged(f)?.takeIf { it.pageCount == 0 || cache.has(it.fileId) } ?: copy(folder, f)
         }
         val hashes = present.keys.associateWith { n -> stored.firstOrNull { it.file.name == n }?.fileId }
-        val record = updateRecord(folder, name, old, stored, hashes, path) ?: return
+        val record = updateRecord(folder, name, old, stored, hashes, path)
         val byName = stored.associateBy { it.file.name }
         val set = SongSet.of(name, record.order.mapNotNull { n ->
             val f = byName[n] ?: return@mapNotNull null
@@ -301,18 +301,17 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     /**
      * Brings the record of [folder] (or of a single PDF) up to date with the files read now
      * ([hashes]: each listed file with its hash, null if it could not be read): songs follow
-     * renames, those whose file is gone or changed lose their notes, and new songs whose PDF has
-     * notes elsewhere may start with a copy of them, if the user wants. Null if the user
-     * cancelled; nothing is changed then.
+     * renames, those whose file is gone or changed lose their notes, and new songs start without
+     * notes, even if their PDF has notes in another set (see [copyNotes]).
      */
-    private suspend fun updateRecord(
+    private fun updateRecord(
         folder: Uri,
         name: String,
         old: SetRecord?,
         stored: List<StoredFile>,
         hashes: Map<String, String?>,
         path: List<String>?,
-    ): SetRecord? {
+    ): SetRecord {
         val changes = SongReconcile.reconcile(
             old?.songs.orEmpty(), old?.files.orEmpty().associate { it.file.name to it.file.documentId },
             hashes, stored.associate { it.file.name to it.file.documentId }, NotesKey::newId,
@@ -328,47 +327,10 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             songs = changes.songs,
             path = path ?: old?.path,
         )
-        val offers = notesOffers(record, changes.added)
-        val take = if (offers.isEmpty()) emptySet() else askNotesOffer(name, offers) ?: return null
-        offers.filter { it.name in take }.forEach { notes.copy(it.notesKey, record.notesKey(it.name)!!) }
         folders.save(folder, record)
         if (old != null && old.folder != record.folder) folders.remove(old)
         changes.removed.forEach { notes.delete(NotesKey.of(record.id, it)) }
         return record
-    }
-
-    /**
-     * For each of the [added] songs of [record], the most recently changed notes of another song
-     * with the same PDF, in any set; songs whose PDF has no notes elsewhere are left out.
-     */
-    private fun notesOffers(record: SetRecord, added: List<String>): List<NotesOffer> {
-        if (added.isEmpty()) return emptyList()
-        val records = folders.all().filter { it.id != record.id } + record
-        return added.mapNotNull { n ->
-            val fileId = record.songs.getValue(n).fileId
-            records.flatMap { r ->
-                r.songs.filter { (other, e) -> e.fileId == fileId && !(r === record && other in added) }.mapNotNull { (other, _) ->
-                    val key = r.notesKey(other)!!
-                    notes.lastChanged(key)?.let { NotesOffer(n, r.name, other, key, it) }
-                }
-            }.maxByOrNull { it.changed }
-        }
-    }
-
-    /** Asks which of the [offers] to take, before the set is shown; null if the user cancels. */
-    private suspend fun askNotesOffer(set: String, offers: List<NotesOffer>): Set<String>? {
-        val answer = CompletableDeferred<Set<String>?>()
-        _state.update { it.copy(notesOffer = NotesOfferUi(set, offers, answer), busy = null) }
-        try {
-            return answer.await()
-        } finally {
-            _state.update { if (it.notesOffer?.answer === answer) it.copy(notesOffer = null) else it }
-        }
-    }
-
-    /** The answer to the notes offer: the songs that start with a copy, or null to cancel. */
-    fun answerNotesOffer(take: Set<String>?) {
-        _state.value.notesOffer?.answer?.complete(take)
     }
 
     fun reloadFolder() {
@@ -612,6 +574,51 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     override fun load(key: PageKey): NotesStore.Page = notes.load(key)
+
+    /** Opens Copy notes from… for the song on the leftmost screen: the other songs with its PDF that have notes. */
+    fun showCopyNotes() {
+        val s = _state.value.session
+        val song = s.set?.let { set -> set.songIndexAt(s.start).takeIf { it >= 0 }?.let { set.songs[it] } } ?: return
+        scope.launch {
+            val sources = NotesSources.of(folders.all(), song.fileId, song.notesKey)
+                .mapNotNull { src -> notes.lastChanged(src.notesKey)?.let { src to it } }
+                .sortedByDescending { it.second }
+            val ui = CopyNotesUi(song.name, song.notesKey, notes.lastChanged(song.notesKey) != null, sources)
+            _state.update { it.copy(copyNotes = ui) }
+        }
+    }
+
+    fun closeCopyNotes() = _state.update { it.copy(copyNotes = null) }
+
+    /**
+     * Replaces the notes of the song in Copy notes from… by a copy of [source]'s. The song gets a
+     * new notes ID: the old notes are deleted, so late edits to them from a secondary are dropped,
+     * and every screen showing the song gets the copy with its next display command.
+     */
+    fun copyNotes(source: NotesSource) {
+        val ui = _state.value.copyNotes ?: return
+        _state.update { it.copy(copyNotes = null) }
+        val setId = ui.notesKey.substringBefore('/')
+        scope.launch(orderWrites) {
+            val record = folders.all().firstOrNull { it.id == setId }
+            val entry = record?.songs?.get(ui.song)
+            if (entry == null || record.notesKey(ui.song) != ui.notesKey) {
+                showMessage("Could not copy the notes: the set has changed meanwhile.")
+                return@launch
+            }
+            val notesId = NotesKey.newId()
+            val key = NotesKey.of(setId, notesId)
+            notes.copy(source.notesKey, key)
+            folders.save(Uri.parse(record.folder), record.copy(songs = record.songs + (ui.song to entry.copy(notesId = notesId))))
+            notes.delete(ui.notesKey)
+            withContext(Dispatchers.Main) {
+                updateSession { s ->
+                    val set = s.set ?: return@updateSession s
+                    s.copy(set = set.withNotesKey(ui.notesKey, key))
+                }
+            }
+        }
+    }
 
     override fun saveFromSecondary(uuid: String, notes: SecondaryClient.Notes) {
         val key = PageKey(notes.notesKey?.takeIf(NotesKey::isValid) ?: return, notes.page)

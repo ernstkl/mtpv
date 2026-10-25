@@ -105,6 +105,9 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                             val count = if (set.shownSongs == set.songs.size) "${set.songs.size}" else "${set.shownSongs}/${set.songs.size}"
                             MenuItem("Songs ($count)") { menu { showSongs = true } }
                         }
+                        set.songIndexAt(s.start).takeIf { it >= 0 }?.let { i ->
+                            MenuItem("Copy notes from…", songTitle(set.songs[i].name)) { menu(rt::showCopyNotes) }
+                        }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     MenuItem("Open set from library…") { menu { showSets = true } }
@@ -179,7 +182,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     if (showSets) SetsDialog(rt, st, onChooseLibrary = { libraryPicker.launch(null) }) { showSets = false }
     if (showSongs) SongsDialog(rt, st) { showSongs = false }
     if (showAbout) AboutDialog { showAbout = false }
-    st.notesOffer?.let { NotesOfferDialog(it, rt::answerNotesOffer) }
+    st.copyNotes?.let { CopyNotesDialog(it, rt::copyNotes, rt::closeCopyNotes) }
 
     st.pairing?.let { p ->
         AlertDialog(
