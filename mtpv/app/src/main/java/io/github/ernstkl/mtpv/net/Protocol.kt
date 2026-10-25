@@ -3,7 +3,9 @@ package io.github.ernstkl.mtpv.net
 /**
  * HTTP API offered by a secondary (all JSON):
  *
- *   GET  /v1/info          {uuid, name, apiVersion}                       (open)
+ *   GET  /v1/info          {uuid, name, apiVersion}                       (open; also how the controller
+ *                                                                          finds secondaries by address scan
+ *                                                                          on DEFAULT_PORT where mDNS fails)
  *   POST /v1/pair          {controller, name} -> {requestId, code}        (open)
  *   GET  /v1/pair/{id}     {status: pending|allowed|denied|unknown, token} (open; token once, on allowed)
  *

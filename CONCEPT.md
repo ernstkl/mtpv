@@ -59,7 +59,7 @@ another folder copies the input, not the set. User texts (README, About) say so 
 |---|---|
 | `net/` | `Protocol.kt`: the HTTP API a secondary offers. This is the contract between the roles. |
 | `secondary/` | NanoHTTPD server, mDNS announcement (`_mtpv._tcp`, UUID in TXT), pairing, the shown page and its notes. |
-| `controller/` | mDNS discovery, one `SecondaryLink` per secondary that converges it to its target page, the HTTP client. |
+| `controller/` | mDNS discovery with an address scan as fallback, one `SecondaryLink` per secondary that converges it to its target page, the HTTP client. |
 | `core/` | Role-independent parts: paging and version rules, PDF cache (keyed by SHA-256), notes model and store, `PdfRenderer` wrapper. |
 | `ui/` | Compose screens for both roles, the page view with its notes layer, tap zones and pedal keys. |
 | top level | `MtpvApp` holds the active role, `KeepAliveService` keeps the process alive, `Prefs` persists role and session. |

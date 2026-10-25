@@ -32,6 +32,7 @@ import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.moved
 import io.github.ernstkl.mtpv.net.Endpoint
+import io.github.ernstkl.mtpv.net.Protocol
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -94,6 +95,8 @@ data class ControllerState(
     /** Secondaries found on the network that are not paired with this controller. */
     val nearby: Map<String, KnownSecondary> = emptyMap(),
     val pairing: PairingUi? = null,
+    /** An address scan is running. */
+    val scanning: Boolean = false,
     /** Null until a library folder is chosen. */
     val library: LibraryUi? = null,
     /** Copy notes from…, while it is open. */
@@ -140,6 +143,11 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private val versions = VersionClock({ prefs.lastVersion }, { prefs.lastVersion = it })
     private val links = mutableMapOf<String, Pair<SecondaryLink, Job>>()
     private var discovery: Discovery? = null
+    private val scanner = AddressScanner(app)
+    private var scanJob: Job? = null
+    private var lastScan = 0L
+    /** Pause between automatic scans; doubles after each. Lost contact resets it and allows a scan right away. */
+    private var scanEvery = SCAN_EVERY_MS
 
     private val _state = MutableStateFlow(ControllerState(
             restoreSession(), tools = prefs.tools, library = prefs.library?.let { LibraryUi(prefs.libraryPath) },
@@ -157,6 +165,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun start() {
         discovery = Discovery(app, ::onFound).also { it.start() }
         syncLinks()
+        scope.launch(Dispatchers.Main) { scanWhileMissing() }
         if (_state.value.session.set == null) reloadFolder() else relocateFolder()
     }
 
@@ -502,6 +511,45 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         }
     }
 
+    /**
+     * Probes every address of the local networks for secondaries, for networks where mDNS finds
+     * nothing (some hotspots, Wi-Fi Direct). Answers count like discovery results. [manual]: tapped
+     * under Screens, so say when nothing answered.
+     */
+    fun scan(manual: Boolean = true) {
+        if (scanJob?.isActive == true) return
+        lastScan = System.currentTimeMillis()
+        scanJob = scope.launch {
+            _state.update { it.copy(scanning = true) }
+            try {
+                val r = scanner.scan(Protocol.DEFAULT_PORT) { info, ep ->
+                    withContext(Dispatchers.Main) { onFound(info.uuid, info.name, ep) }
+                }
+                if (manual && r.probed == 0) showMessage("Not connected to a local network.")
+                else if (manual && r.found == 0) showMessage("No MTPV secondary answered on this network.")
+            } finally {
+                _state.update { it.copy(scanning = false) }
+            }
+        }
+    }
+
+    /**
+     * Scans now and then while a secondary in the arrangement cannot be reached and mDNS has not
+     * found it again; less and less often while it stays away (it may just be switched off).
+     */
+    private suspend fun scanWhileMissing() {
+        delay(SCAN_FIRST_MS)
+        while (true) {
+            val st = _state.value
+            val missing = st.session.arrangement.any { it != Paging.SELF && st.links[it]?.online != true }
+            if (missing && System.currentTimeMillis() - lastScan >= scanEvery) {
+                scan(manual = false)
+                scanEvery = minOf(scanEvery * 2, SCAN_MAX_MS)
+            }
+            delay(SCAN_CHECK_MS)
+        }
+    }
+
     fun move(slot: Int, delta: Int) = updateSession { s -> s.copy(arrangement = s.arrangement.moved(slot, delta)) }
 
     fun include(uuid: String) = updateSession { s ->
@@ -796,7 +844,11 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                     report = { status ->
                         val was = _state.getAndUpdate { it.copy(links = it.links + (uuid to status)) }.links[uuid]
                         // Lost contact: its address may have changed; older Android does not tell by itself.
-                        if (was?.online == true && !status.online) scope.launch(Dispatchers.Main) { discovery?.refresh() }
+                        if (was?.online == true && !status.online) scope.launch(Dispatchers.Main) {
+                            discovery?.refresh()
+                            scanEvery = SCAN_EVERY_MS
+                            lastScan = 0L
+                        }
                     },
                     onInput = { event -> scope.launch(Dispatchers.Main) { onInput(uuid, event) } },
                 )
@@ -823,6 +875,11 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     companion object {
         private const val PAIR_TIMEOUT_MS = 60_000L
         private const val FLUSH_TIMEOUT_MS = 5_000L
+        /** mDNS gets this long after start before the first scan. */
+        private const val SCAN_FIRST_MS = 5_000L
+        private const val SCAN_EVERY_MS = 30_000L
+        private const val SCAN_MAX_MS = 300_000L
+        private const val SCAN_CHECK_MS = 5_000L
         const val FRONT_EVENT = "front"
     }
 }

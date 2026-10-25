@@ -42,7 +42,9 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    the menu → **Screens** → under
    *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary (both show the same code).
    Paired secondaries are added to the right of the controller; **Screens** sets the order (the
-   controller can be in any position) and lets you add a secondary by IP if mDNS is blocked.
+   controller can be in any position). If a secondary does not appear (mDNS blocked, as on some phone
+   hotspots), **Search network** tries every address of the local network; the controller also does this
+   by itself while a paired secondary cannot be reached. Adding a secondary by IP still works too.
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
    Then **Open single PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
    For a song set, collect one PDF per song in a folder below the **Library folder** (in the menu under **Library**; folders in

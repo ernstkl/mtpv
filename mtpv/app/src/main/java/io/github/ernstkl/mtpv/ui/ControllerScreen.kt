@@ -375,9 +375,12 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
                 SectionDivider()
                 Text(
 "Secondaries on the same Wi-Fi appear under Nearby. Pair one, then tap Allow on it. If it does not " +
-                        "appear, enter the address shown on the secondary.",
+                        "appear, tap Search network, or enter the address shown on the secondary.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                TextButton(onClick = { rt.scan() }, enabled = !st.scanning) {
+                    Text(if (st.scanning) "Searching…" else "Search network")
+                }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(

@@ -40,7 +40,10 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
         data object NotesUnsaved : DisplayResult
     }
 
-    fun info(): Info = request("GET", "/v1/info").let { (_, json) ->
+    /** Shorter timeouts for probing an address that may have no secondary, or no device at all. */
+    fun info(probe: Boolean = false): Info =
+        (if (probe) request("GET", "/v1/info", readTimeoutMs = PROBE_READ_MS, connectTimeoutMs = PROBE_CONNECT_MS)
+        else request("GET", "/v1/info")).let { (_, json) ->
         Info(json.getString("uuid"), json.getString("name"))
     }
 
@@ -161,8 +164,9 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
         body: ByteArray? = null,
         acceptErrors: Boolean = false,
         readTimeoutMs: Int = 5_000,
+        connectTimeoutMs: Int = 3_000,
     ): Pair<Int, JSONObject> {
-        val conn = open(method, path, readTimeoutMs)
+        val conn = open(method, path, readTimeoutMs, connectTimeoutMs)
         try {
             if (body != null) {
                 conn.doOutput = true
@@ -182,11 +186,11 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
         }
     }
 
-    private fun open(method: String, path: String, readTimeoutMs: Int = 5_000): HttpURLConnection {
+    private fun open(method: String, path: String, readTimeoutMs: Int = 5_000, connectTimeoutMs: Int = 3_000): HttpURLConnection {
         val host = if (ep.host.contains(':')) "[${ep.host}]" else ep.host
         return (URL("http", host, ep.port, path).openConnection() as HttpURLConnection).apply {
             requestMethod = method
-            connectTimeout = 3_000
+            connectTimeout = connectTimeoutMs
             readTimeout = readTimeoutMs
             useCaches = false
             token?.let { setRequestProperty("Authorization", "Bearer $it") }
@@ -200,6 +204,9 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
     }
 
     companion object {
+        private const val PROBE_CONNECT_MS = 700
+        private const val PROBE_READ_MS = 1_500
+
         fun parseState(json: JSONObject) = State(
             fileId = json.optString("fileId").ifEmpty { null },
             page = json.optInt("page"),

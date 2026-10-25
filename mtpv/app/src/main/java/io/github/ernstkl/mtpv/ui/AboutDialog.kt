@@ -37,7 +37,8 @@ private val Sections = listOf(
             "2. On the extra tablets, choose Secondary.",
             "3. On one tablet, choose Controller and open a PDF. Then Screens → Pair; " +
                 "check that the secondary shows the same code and tap Allow there.",
-            "Screens also sets the order of the screens, left to right. If a secondary isn't found, enter its address there.",
+            "Screens also sets the order of the screens, left to right. " +
+                "If a secondary isn't found, tap Search network there, or enter its address.",
             "Needs Android 10 or newer.",
         ),
     ),
