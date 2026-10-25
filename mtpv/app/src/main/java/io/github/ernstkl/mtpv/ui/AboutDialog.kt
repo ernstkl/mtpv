@@ -13,12 +13,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import io.github.ernstkl.mtpv.BuildConfig
 
 /** What MTPV is and how to set it up; shown from every role, and once on the first start. */
 @Composable
 fun AboutDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val version = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
+        ?.let { name -> BuildConfig.GIT_COMMIT?.let { "$name ($it)" } ?: name }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("MTPV – Multi-Tablet PDF Viewer") },

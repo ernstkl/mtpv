@@ -6,6 +6,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// The commit this build comes from, "-dirty" when tracked files differ from it; null without git.
+val gitCommit = runCatching {
+    providers.exec {
+        commandLine("git", "describe", "--always", "--dirty", "--abbrev=7", "--exclude=*")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim()
+}.getOrNull()?.takeIf { it.isNotEmpty() }
+
 android {
     namespace = "io.github.ernstkl.mtpv"
     compileSdk = 35
@@ -16,6 +24,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "GIT_COMMIT", gitCommit?.let { "\"$it\"" } ?: "null")
     }
 
     // Signs release builds for testers when keystore.properties exists (kept out of git).
@@ -48,6 +57,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     // F-Droid: no Google-encrypted dependency metadata blob in the APK.
     dependenciesInfo {

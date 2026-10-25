@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.ernstkl.mtpv.controller.ControllerRuntime
@@ -68,6 +70,20 @@ fun SongsDialog(rt: ControllerRuntime, st: ControllerState, onDismiss: () -> Uni
                             Column(Modifier.background(if (dragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)) {
                                 if (order.first() != i) HorizontalDivider()
                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val titleColor = when {
+                                        song.excluded -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        shown -> MaterialTheme.colorScheme.primary
+                                        else -> Color.Unspecified
+                                    }
+                                    // The number in its own column, so it does not read as part of the title.
+                                    Text(
+                                        if (song.excluded) "" else "${set.numberOf(i)}",
+                                        Modifier.width(28.dp),
+                                        maxLines = 1,
+                                        textAlign = TextAlign.End,
+                                        fontWeight = if (shown) FontWeight.Bold else null,
+                                        color = titleColor,
+                                    )
                                     Checkbox(checked = !song.excluded, onCheckedChange = { rt.excludeSong(i, !it) })
                                     Column(
                                         Modifier
@@ -76,15 +92,11 @@ fun SongsDialog(rt: ControllerRuntime, st: ControllerState, onDismiss: () -> Uni
                                             .padding(vertical = 8.dp),
                                     ) {
                                         Text(
-                                            (if (song.excluded) "" else "${set.numberOf(i)}. ") + songTitle(song.name),
+                                            songTitle(song.name),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             fontWeight = if (shown) FontWeight.Bold else null,
-                                            color = when {
-                                                song.excluded -> MaterialTheme.colorScheme.onSurfaceVariant
-                                                shown -> MaterialTheme.colorScheme.primary
-                                                else -> Color.Unspecified
-                                            },
+                                            color = titleColor,
                                         )
                                         Text(
                                             (if (song.pageCount == 1) "1 page" else "${song.pageCount} pages") +
