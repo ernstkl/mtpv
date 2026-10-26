@@ -7,10 +7,9 @@ build, usage and protocol summary: `mtpv/README.md`.
 
 - `mtpv/` is the Gradle project (Kotlin, Compose). Run Gradle from there:
   `./gradlew assembleDebug`, `./gradlew testDebugUnitTest`.
-- `OpenSongTablet/` is a read-only reference clone of upstream OpenSong, its own git repo and ignored
-  here. Never edit it; MTPV does not build on it.
-- `developer-notes/` holds private planning notes and early drafts, ignored by git. Background only;
-  where they disagree with the code, the code wins.
+- `developer-notes/` holds private planning notes (`TODO.md`, wishlist) and early drafts. It is its
+  own local git repo with no remote, ignored here; commit changes to it there, never in this repo.
+  Background only; where they disagree with the code, the code wins.
 - `fdroid/` holds the draft F-Droid metadata.
 
 ## Rules
