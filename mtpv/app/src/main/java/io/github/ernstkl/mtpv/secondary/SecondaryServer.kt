@@ -3,24 +3,41 @@ package io.github.ernstkl.mtpv.secondary
 import io.github.ernstkl.mtpv.core.DirectCode
 import io.github.ernstkl.mtpv.core.HashMismatchException
 import io.github.ernstkl.mtpv.core.NotesJson
+import io.github.ernstkl.mtpv.core.PairCode
 import io.github.ernstkl.mtpv.core.PagePosition
 import io.github.ernstkl.mtpv.core.PdfCache
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.net.Protocol
+import io.github.ernstkl.mtpv.net.Tls
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.InputStream
 import java.net.Socket
 
-/** The secondary's HTTP API, see [Protocol]. Each request runs on its own NanoHTTPD thread. */
-class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(port) {
+/**
+ * The secondary's HTTPS API, see [Protocol]. Each connection has its own NanoHTTPD thread, which
+ * serves its requests one after another; the client's certificate decides what they may do.
+ */
+class SecondaryServer(port: Int, private val rt: SecondaryRuntime, identity: Tls.Identity) : NanoHTTPD(port) {
 
-    // NanoHTTPD writes headers and body separately; without TCP_NODELAY, Nagle holds the body back
-    // until the controller's delayed ACK, about 40 ms on every request.
+    /** The fingerprint of the client certificate on this thread's connection, "" without one. */
+    private val peer = ThreadLocal<String>()
+
+    init {
+        setServerSocketFactory(Tls.serverSocketFactory(identity))
+    }
+
     override fun createClientHandler(socket: Socket, input: InputStream): ClientHandler {
+        // NanoHTTPD writes headers and body separately; without TCP_NODELAY, Nagle holds the body back
+        // until the controller's delayed ACK, about 40 ms on every request.
         socket.tcpNoDelay = true
-        return super.createClientHandler(socket, input)
+        return object : ClientHandler(input, socket) {
+            override fun run() {
+                peer.set(Tls.peerFingerprint(socket).orEmpty())
+                super.run()
+            }
+        }
     }
 
     override fun serve(session: IHTTPSession): Response = try {
@@ -35,20 +52,28 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
 
     private fun route(s: IHTTPSession): Response {
         val path = s.uri
-        // Open to anyone: who am I, and asking to be paired.
+        val fingerprint = peer.get().orEmpty()
+        // Open to any client: who am I, and asking to be paired.
         when {
             s.method == Method.GET && path == "/v1/info" -> return ok(rt.info())
             s.method == Method.POST && path == "/v1/pair" -> {
                 val body = JSONObject(String(readBody(s), Charsets.UTF_8))
-                val req = rt.pairing.request(body.getString("controller"), body.optString("name").ifEmpty { "Controller" })
+                val commit = body.optString("commit")
+                if (fingerprint.isEmpty() || !PairCode.isHex(commit, 32)) return error(Response.Status.BAD_REQUEST, Protocol.ERR_BAD_NONCE, "commit")
+                val (id, nonce) = rt.pairing.request(body.getString("controller"), body.optString("name").ifEmpty { "Controller" }, fingerprint, commit)
                     ?: return error(Response.Status.CONFLICT, Protocol.ERR_ALREADY_PAIRED, "paired with another controller")
-                return ok(JSONObject().put("requestId", req.id).put("code", req.code))
+                return ok(JSONObject().put("requestId", id).put("nonce", nonce))
             }
-            s.method == Method.GET && path.startsWith("/v1/pair/") -> return ok(rt.pairing.status(path.removePrefix("/v1/pair/")))
+            s.method == Method.POST && path.startsWith("/v1/pair/") && path.endsWith("/nonce") -> {
+                val body = JSONObject(String(readBody(s), Charsets.UTF_8))
+                val id = path.removePrefix("/v1/pair/").removeSuffix("/nonce")
+                return rt.pairing.reveal(id, fingerprint, body.optString("nonce"))?.let { ok(it) }
+                    ?: error(Response.Status.BAD_REQUEST, Protocol.ERR_BAD_NONCE, "nonce does not match the commit")
+            }
+            s.method == Method.GET && path.startsWith("/v1/pair/") -> return ok(rt.pairing.status(path.removePrefix("/v1/pair/"), fingerprint))
         }
         // Everything else only for paired controllers.
-        val token = s.headers["authorization"]?.removePrefix("Bearer ")?.trim()
-        val controller = rt.pairing.controllerFor(token)
+        val controller = rt.pairing.controllerFor(fingerprint)
             ?: return error(Response.Status.UNAUTHORIZED, Protocol.ERR_NOT_PAIRED, "pair this controller first")
         rt.onContact()
         return when {
@@ -77,6 +102,9 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
             s.method == Method.PUT && path.startsWith("/v1/files/") -> putFile(s, path.removePrefix("/v1/files/"))
             s.method == Method.POST && path == "/v1/display" -> {
                 val body = JSONObject(String(readBody(s), Charsets.UTF_8))
+                if (body.optString("controller") != controller) {
+                    return error(Response.Status.UNAUTHORIZED, Protocol.ERR_NOT_PAIRED, "controller does not match its certificate")
+                }
                 rt.applyDisplay(
                     controller = controller,
                     version = body.getLong("version"),
@@ -110,7 +138,7 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
 
     private fun readBody(s: IHTTPSession): ByteArray {
         val declared = contentLength(s) ?: 0
-        // Checked before allocating: /v1/pair is open to anyone on the network.
+        // Checked before allocating: /v1/pair is open to any client on the network.
         if (declared !in 0..Protocol.MAX_JSON_BODY) throw BodyTooLargeException("Content-Length $declared")
         val length = declared.toInt()
         val buf = ByteArray(length)

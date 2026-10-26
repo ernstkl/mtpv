@@ -21,6 +21,7 @@ import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.VersionGate
 import io.github.ernstkl.mtpv.net.DirectState
 import io.github.ernstkl.mtpv.net.Protocol
+import io.github.ernstkl.mtpv.net.Tls
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,7 @@ import java.io.File
 import java.io.IOException
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import kotlin.concurrent.thread
 
 /**
  * Notes of the page a secondary shows; [notesKey] names the song they belong to on the controller.
@@ -141,7 +143,9 @@ class SecondaryRuntime(private val app: MtpvApp) {
         if (!active) return
         val paired = pairing.paired.value.map { it.uuid }
         if (server == null) {
-            server = startServer()
+            // The server needs this device's key; making it the first time takes a moment.
+            val identity = Tls.loaded() ?: return loadIdentity()
+            server = startServer(identity)
             port = server?.listeningPort ?: 0
         }
         val open = Presence.open(paired)
@@ -181,11 +185,26 @@ class SecondaryRuntime(private val app: MtpvApp) {
         registration = null
     }
 
+    private var loadingIdentity = false
+
+    /** Loads or makes the key off the main thread, then carries on with [updatePresence]. */
+    private fun loadIdentity() {
+        if (loadingIdentity) return
+        loadingIdentity = true
+        thread(name = "mtpv-identity") {
+            val ok = runCatching { Tls.identity() }.onFailure { Log.e(TAG, "no device key", it) }.isSuccess
+            main.post {
+                loadingIdentity = false
+                if (ok) updatePresence()
+            }
+        }
+    }
+
     /** The fixed port makes manual entry predictable; fall back to any free port. */
-    private fun startServer(): SecondaryServer? {
+    private fun startServer(identity: Tls.Identity): SecondaryServer? {
         for (p in listOf(Protocol.DEFAULT_PORT, 0)) {
             try {
-                return SecondaryServer(p, this).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, true) }
+                return SecondaryServer(p, this, identity).also { it.start(NanoHTTPD.SOCKET_READ_TIMEOUT, true) }
             } catch (e: IOException) {
                 Log.w(TAG, "port $p unavailable", e)
             }

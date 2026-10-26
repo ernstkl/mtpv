@@ -47,6 +47,9 @@ object Tls {
     /** This device's identity, made on first use (blocks some 100 ms then: not on the main thread). */
     fun identity(): Identity = own ?: synchronized(this) { own ?: Identity.load(ALIAS).also { own = it } }
 
+    /** This device's identity if [identity] has loaded it already. */
+    fun loaded(): Identity? = own
+
     /** For a paired secondary: only the certificate with fingerprint [pin]. */
     fun pinned(pin: String): Client = pinnedClients.getOrPut(pin) { Client(identity(), PinnedTrust(pin)) }
 

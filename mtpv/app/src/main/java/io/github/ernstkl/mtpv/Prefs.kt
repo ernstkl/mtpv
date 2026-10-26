@@ -22,8 +22,8 @@ enum class Role { NONE, CONTROLLER, SECONDARY }
  */
 data class KnownSecondary(val uuid: String, val name: String, val host: String?, val port: Int, val token: String? = null)
 
-/** A controller this secondary accepts commands from (secondary side). */
-data class PairedController(val uuid: String, val name: String, val token: String)
+/** A controller this secondary accepts commands from (secondary side), known by its certificate's [fingerprint]. */
+data class PairedController(val uuid: String, val name: String, val fingerprint: String)
 
 /**
  * What the controller restores at the next start. [start] is a page in the stream of the set's
@@ -162,13 +162,16 @@ class Prefs(private val context: Context) {
 
     fun loadPaired(): List<PairedController> = sp.getString("paired", null)?.let { s ->
         JSONArray(s).let { a ->
-            List(a.length()) { a.getJSONObject(it) }.map { PairedController(it.getString("uuid"), it.getString("name"), it.getString("token")) }
+            // Entries without a fingerprint (from before TLS) are dropped: that controller pairs again.
+            List(a.length()) { a.getJSONObject(it) }.mapNotNull { o ->
+                o.optString("fingerprint").ifEmpty { null }?.let { PairedController(o.getString("uuid"), o.getString("name"), it) }
+            }
         }
     }.orEmpty()
 
     fun savePaired(list: List<PairedController>) {
         val a = JSONArray()
-        list.forEach { a.put(JSONObject().put("uuid", it.uuid).put("name", it.name).put("token", it.token)) }
+        list.forEach { a.put(JSONObject().put("uuid", it.uuid).put("name", it.name).put("fingerprint", it.fingerprint)) }
         sp.edit().putString("paired", a.toString()).apply()
     }
 
