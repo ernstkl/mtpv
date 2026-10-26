@@ -3,7 +3,8 @@
 One app, two roles. A **controller** tablet opens a PDF and turns pages. Each **secondary** tablet
 shows one page: the screen to the right of the controller shows the next page, and so on.
 A page turn moves every screen by one page. It is made for one person with two or three tablets,
-like a sheet of music spread over several pages.
+like a sheet of music spread over several pages. On a single tablet the controller works on its own
+as a sheet music reader: song sets, pedal, notes and dark pages need no secondary.
 
 Architecture overview: [`../CONCEPT.md`](../CONCEPT.md).
 
@@ -36,6 +37,7 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
 ## Use
 
 1. Install on all tablets, all on the same Wi-Fi (no shared Wi-Fi: see *Direct network* below).
+   Only one tablet: choose **Controller** and skip pairing.
 2. First start: choose **Controller** on one tablet and **Secondary** on the others. The choice is
    remembered, so later starts go straight into the role. **Device role** in the menu changes it; back
    or Cancel keeps the current role running.

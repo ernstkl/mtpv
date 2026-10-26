@@ -31,7 +31,7 @@ private class AboutSection(val title: String, val summary: String, val details: 
 private val Sections = listOf(
     AboutSection(
         "Setting up",
-        "Same Wi-Fi (or a direct network); extra tablets are Secondary, one is Controller; pair them under Screens.",
+        "One tablet alone: Controller. More: same Wi-Fi (or a direct network), extras are Secondary, paired under Screens.",
         listOf(
             "1. Put all tablets in the same Wi-Fi, or see Direct network below.",
             "2. On the extra tablets, choose Secondary.",
@@ -46,6 +46,7 @@ private val Sections = listOf(
                 "join it by themselves. Wi-Fi must be on, but no Wi-Fi network is needed.",
             "A secondary never paired, with no shared Wi-Fi: ☰ → Join direct network… on it, type the code " +
                 "shown on the controller under Screens, then pair as in 3.",
+            "Only one tablet: choose Controller and open a PDF; no Wi-Fi or pairing needed.",
             "Needs Android 10 or newer.",
         ),
     ),
@@ -119,7 +120,10 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 if (section != null) {
                     section.details.forEach { Text(it) }
                 } else {
-                    Text("Spreads a PDF across several tablets, one page per tablet.")
+                    Text(
+                        "Spreads a PDF across several tablets, one page per tablet. On a single tablet, as Controller, " +
+                            "it is a sheet music reader with song sets, pedal and notes.",
+                    )
                     Sections.forEach { s ->
                         Row(
                             Modifier.fillMaxWidth().clickable { open = s }.padding(vertical = 4.dp),

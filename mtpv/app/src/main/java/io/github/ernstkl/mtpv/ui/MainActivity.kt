@@ -142,6 +142,7 @@ private fun RoleChooser(prefs: Prefs, current: Role, onCancel: () -> Unit, onCho
         Button(onClick = { onChoose(Role.CONTROLLER) }, Modifier.width(320.dp)) {
             Text("Controller: open PDFs and turn pages")
         }
+        Text("Only one tablet? Choose Controller.", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = { onChoose(Role.SECONDARY) }, Modifier.width(320.dp)) {
             Text("Secondary: show one page")
