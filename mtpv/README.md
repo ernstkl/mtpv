@@ -104,7 +104,7 @@ MTPV is back. Menu → **Direct network**:
 *Start by itself when needed* (on by default), **Start**/**Stop** by hand (Stop holds until the next
 app start), **New code** (secondaries reachable only through the network then need it typed).
 **Leave** on a secondary forgets the code until the controller hands it over again. Android asks once
-to allow *Nearby devices* (Android 12 and older: location; if it then fails, switching location on
+to allow *Nearby devices* (Android 12 and older: location, after a note that MTPV never reads it; if it then fails, switching location on
 may help): on the controller once screens are paired, on a secondary once it has a code. The code
 only lets a tablet into the network; pairing is still needed to control the screens.
 

@@ -18,7 +18,7 @@
 <li>Resumes the last PDF, page and screen arrangement after a restart</li>
 </ul>
 
-<p><b>No Wi-Fi at the venue?</b> The controller then starts its own direct network (Wi-Fi Direct), and tablets paired at home join it by themselves. No router and no internet connection are needed, and nothing leaves your tablets.</p>
+<p><b>No Wi-Fi at the venue?</b> The controller then starts its own direct network (Wi-Fi Direct), and tablets paired at home join it by themselves. No router and no internet connection are needed, and nothing leaves your tablets. Up to Android 12, Android allows this only with the location permission; MTPV asks for it with an explanation and never reads your location.</p>
 
 <p><b>Requirements</b></p>
 <ul>

@@ -1,5 +1,6 @@
 package io.github.ernstkl.mtpv.ui
 
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,25 @@ import io.github.ernstkl.mtpv.net.DirectState
 import io.github.ernstkl.mtpv.net.DirectWifi
 import io.github.ernstkl.mtpv.secondary.SecondaryRuntime
 
+/** Below Android 13 the system prompt names only location, so [LocationNote] says why first. */
+private val explainFirst = Build.VERSION.SDK_INT < 33
+
+/** Why a music app asks for location; [onContinue] then shows the system prompt, also on dismiss. */
+@Composable
+private fun LocationNote(onContinue: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onContinue,
+        title = { Text("Location permission") },
+        text = {
+            Text(
+                "Up to Android 12, Android allows the direct network between the tablets only with the " +
+                    "location permission. MTPV never reads your location. Without it, a shared Wi-Fi still works.",
+            )
+        },
+        confirmButton = { TextButton(onClick = onContinue) { Text("Continue") } },
+    )
+}
+
 /**
  * Asks for the Wi-Fi Direct permission if needed, then runs [action] either way: without the
  * permission the direct network reports what is missing.
@@ -50,7 +70,15 @@ private fun withDirectPermission(action: () -> Unit): () -> Unit {
     val context = LocalContext.current
     val current by rememberUpdatedState(action)
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { current() }
-    return { if (DirectWifi.hasPermission(context)) current() else launcher.launch(DirectWifi.permissions) }
+    var explaining by remember { mutableStateOf(false) }
+    if (explaining) LocationNote { explaining = false; launcher.launch(DirectWifi.permissions) }
+    return {
+        when {
+            DirectWifi.hasPermission(context) -> current()
+            explainFirst -> explaining = true
+            else -> launcher.launch(DirectWifi.permissions)
+        }
+    }
 }
 
 /**
@@ -62,12 +90,14 @@ fun AskDirectPermission(needed: Boolean, onAnswered: () -> Unit) {
     val current by rememberUpdatedState(onAnswered)
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { current() }
     var asked by rememberSaveable { mutableStateOf(false) }
+    var explaining by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(needed) {
         if (needed && !asked) {
             asked = true
-            launcher.launch(DirectWifi.permissions)
+            if (explainFirst) explaining = true else launcher.launch(DirectWifi.permissions)
         }
     }
+    if (explaining) LocationNote { explaining = false; launcher.launch(DirectWifi.permissions) }
 }
 
 /** Subtitle of Direct network in the controller's menu. */

@@ -43,7 +43,8 @@ private val Sections = listOf(
             "A paired secondary is no longer offered to other controllers. To pair it with another one, " +
                 "remove its controller on it first (☰ → Paired controllers → Remove).",
             "No shared Wi-Fi? The controller then starts its own direct network, and paired secondaries " +
-                "join it by themselves. Wi-Fi must be on, but no Wi-Fi network is needed.",
+                "join it by themselves. Wi-Fi must be on, but no Wi-Fi network is needed. Up to Android 12 " +
+                "this needs the location permission; MTPV never reads your location.",
             "A secondary never paired, with no shared Wi-Fi: ☰ → Join direct network… on it, type the code " +
                 "shown on the controller under Screens, then pair as in 3.",
             "Only one tablet: choose Controller and open a PDF; no Wi-Fi or pairing needed.",
