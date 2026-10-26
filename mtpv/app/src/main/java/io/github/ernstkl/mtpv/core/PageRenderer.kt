@@ -55,7 +55,8 @@ class RendererHolder(private val cache: PdfCache) {
 
     @Synchronized
     fun get(fileId: String): PageRenderer? {
-        if (fileId == id) return renderer
+        // A file missing a moment ago may have arrived since (sent by the controller), so only a renderer is kept.
+        if (fileId == id && renderer != null) return renderer
         renderer?.close()
         id = fileId
         renderer = if (cache.has(fileId)) runCatching { PageRenderer(cache.file(fileId)) }.getOrNull() else null
