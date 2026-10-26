@@ -11,9 +11,17 @@ import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.InputStream
+import java.net.Socket
 
 /** The secondary's HTTP API, see [Protocol]. Each request runs on its own NanoHTTPD thread. */
 class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(port) {
+
+    // NanoHTTPD writes headers and body separately; without TCP_NODELAY, Nagle holds the body back
+    // until the controller's delayed ACK, about 40 ms on every request.
+    override fun createClientHandler(socket: Socket, input: InputStream): ClientHandler {
+        socket.tcpNoDelay = true
+        return super.createClientHandler(socket, input)
+    }
 
     override fun serve(session: IHTTPSession): Response = try {
         route(session)
