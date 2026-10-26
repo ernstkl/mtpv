@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.ernstkl.mtpv.core.PageKey
+import io.github.ernstkl.mtpv.core.PairCode
 import io.github.ernstkl.mtpv.net.DirectWifi
 import io.github.ernstkl.mtpv.secondary.SecondaryRuntime
 import kotlinx.coroutines.delay
@@ -146,9 +147,11 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
             title = { Text("Pair with ${req.name}?") },
             text = {
                 Column {
-                    Text("Allow only if the controller shows the same code:")
+                    Text("Allow only if ${req.name} shows the same code:")
                     Spacer(Modifier.height(12.dp))
-                    Text(req.code, style = MaterialTheme.typography.displayMedium)
+                    Text(PairCode.format(req.code), style = MaterialTheme.typography.displayMedium)
+                    Spacer(Modifier.height(12.dp))
+                    Text("A different code means another device is in between.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = { TextButton(onClick = { rt.pairing.answer(req.id, allow = true) }) { Text("Allow") } },

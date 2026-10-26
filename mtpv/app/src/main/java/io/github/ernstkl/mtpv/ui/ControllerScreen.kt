@@ -51,6 +51,7 @@ import io.github.ernstkl.mtpv.controller.LinkStatus
 import io.github.ernstkl.mtpv.core.DirectCode
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Paging
+import io.github.ernstkl.mtpv.core.PairCode
 import io.github.ernstkl.mtpv.net.DirectState
 import io.github.ernstkl.mtpv.net.DirectWifi
 import io.github.ernstkl.mtpv.net.Protocol
@@ -245,9 +246,12 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     if (p.code == null) {
                         Text("Contacting ${p.name}…")
                     } else {
-                        Text("On ${p.name}, check that it shows this code and tap Allow:")
+                        Text("Check that ${p.name} shows this code, then tap Allow there:")
                         Spacer(Modifier.height(12.dp))
-                        Text(p.code, style = MaterialTheme.typography.displayMedium)
+                        Text(PairCode.format(p.code), style = MaterialTheme.typography.displayMedium)
+                        Spacer(Modifier.height(12.dp))
+                        Text("A different code means another device is in between: tap Deny there.",
+                            style = MaterialTheme.typography.bodySmall)
                     }
                 }
             },
@@ -450,6 +454,7 @@ private fun nameOf(st: ControllerState, uuid: String): String =
 private fun describe(l: LinkStatus?): String = when {
     l == null -> "connecting…"
     l.upload != null -> "sending PDF ${(l.upload * 100).toInt()}%"
+    l.keyChanged -> "new key (reinstalled?), pair it again"
     l.notPaired -> "not paired"
     l.online -> "online"
     else -> "offline" + (l.error?.let { ": $it" } ?: "")
