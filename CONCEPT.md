@@ -50,7 +50,7 @@ Rules that follow from this:
   with it, notes included.
 - A new set starts without notes, even if its PDFs have notes in other sets. Notes reach a song
   only by an explicit act: **Copy notes from…** on that song (from any song with exactly the same
-  PDF), or, later, a PDF with notes embedded by MTPV put into the folder (`TODO.md`, 1 and 2).
+  PDF), or, later, a PDF with notes embedded by MTPV put into the folder.
 - When the library moves, a set follows its folder (same place below the library folder, most
   files still there): it is the same view on the same folder.
 
