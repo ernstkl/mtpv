@@ -22,8 +22,7 @@
         android:name=".MtpvApp"
         android:label="MTPV"
         android:icon="@mipmap/ic_launcher"
-        android:theme="@style/Theme.Mtpv"
-        android:usesCleartextTraffic="true">
+        android:theme="@style/Theme.Mtpv">
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
