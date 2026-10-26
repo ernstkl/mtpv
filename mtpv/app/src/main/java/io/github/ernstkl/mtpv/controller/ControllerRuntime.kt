@@ -21,6 +21,7 @@ import io.github.ernstkl.mtpv.core.NotesSources
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.PageRenderer
+import io.github.ernstkl.mtpv.core.PairCode
 import io.github.ernstkl.mtpv.core.Paging
 import io.github.ernstkl.mtpv.core.SetAdoption
 import io.github.ernstkl.mtpv.core.SetOrder
@@ -35,6 +36,7 @@ import io.github.ernstkl.mtpv.core.moved
 import io.github.ernstkl.mtpv.net.DirectState
 import io.github.ernstkl.mtpv.net.Endpoint
 import io.github.ernstkl.mtpv.net.Protocol
+import io.github.ernstkl.mtpv.net.Tls
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -650,7 +652,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 withContext(Dispatchers.Main) {
                     onFound(info.uuid, info.name, ep, info.open)
                     when {
-                        _state.value.session.known[info.uuid]?.token != null -> include(info.uuid)
+                        _state.value.session.known[info.uuid]?.fingerprint != null -> include(info.uuid)
                         info.open -> pair(info.uuid)
                         else -> showMessage(alreadyPaired(info.name))
                     }
@@ -726,7 +728,10 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     private var pairJob: Job? = null
 
-    /** Asks secondary [uuid] to accept this controller; someone has to tap Allow on it within a minute. */
+    /**
+     * Asks secondary [uuid] to accept this controller; someone has to tap Allow on it within a minute,
+     * after checking that it shows the same code ([PairCode], see [Protocol]).
+     */
     fun pair(uuid: String) {
         val st = _state.value
         val k = st.session.known[uuid] ?: st.nearby[uuid] ?: return
@@ -735,24 +740,32 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         pairJob = scope.launch {
             _state.update { it.copy(pairing = PairingUi(uuid, k.name, null)) }
             try {
-                val client = SecondaryClient(Endpoint(host, k.port))
-                val (requestId, code) = client.pairRequest(prefs.deviceUuid, prefs.deviceName)
+                val tls = Tls.pairing()
+                val client = SecondaryClient(Endpoint(host, k.port), tls)
+                val nonce = PairCode.newNonce(SecureRandom())
+                val (requestId, theirs) = client.pairRequest(prefs.deviceUuid, prefs.deviceName, PairCode.commit(nonce))
+                val fingerprint = tls.peer ?: throw IOException("no certificate")
+                var status = client.pairNonce(requestId, nonce)
+                val code = PairCode.derive(fingerprint, Tls.identity().fingerprint, nonce, theirs)
                 _state.update { it.copy(pairing = PairingUi(uuid, k.name, code)) }
                 val deadline = System.currentTimeMillis() + PAIR_TIMEOUT_MS
                 while (System.currentTimeMillis() < deadline) {
-                    val r = client.pairStatus(requestId)
-                    when (r.status) {
+                    if (status == "pending") {
+                        delay(1_000)
+                        status = client.pairStatus(requestId)
+                    }
+                    when (status) {
+                        "pending" -> Unit
                         "allowed" -> {
-                            withContext(Dispatchers.Main) { paired(k.copy(token = r.token)) }
+                            withContext(Dispatchers.Main) { paired(k.copy(fingerprint = fingerprint)) }
                             return@launch
                         }
                         "denied" -> {
                             showMessage("${k.name} declined the pairing.")
                             return@launch
                         }
-                        "unknown" -> break
+                        else -> break
                     }
-                    delay(1_000)
                 }
                 showMessage("No answer from ${k.name}. Try again, and tap Allow on it.")
             } catch (e: AlreadyPairedException) {
@@ -1021,7 +1034,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             }.first
             s.known[uuid]?.let { k ->
                 k.host?.let { link.setEndpoint(Endpoint(it, k.port)) }
-                link.setToken(k.token)
+                link.setFingerprint(k.fingerprint)
             }
             link.setTarget(st.targetForSlot(slot))
             link.setTools(st.tools)

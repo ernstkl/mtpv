@@ -6,6 +6,7 @@ import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.PdfCache
 import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.net.Endpoint
+import io.github.ernstkl.mtpv.net.Tls
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -27,6 +28,8 @@ data class LinkStatus(
     val online: Boolean = false,
     /** The secondary refuses this controller: pair it (again). */
     val notPaired: Boolean = false,
+    /** The secondary shows another key than the one pinned at pairing (reinstalled?); with [notPaired]. */
+    val keyChanged: Boolean = false,
     val shownPage: Int? = null,
     val upload: Float? = null,
     val error: String? = null,
@@ -67,7 +70,8 @@ class SecondaryLink(
     @Volatile private var tools: ToolState? = null
     @Volatile private var directCode: String? = null
     @Volatile private var endpoint: Endpoint? = null
-    @Volatile private var token: String? = null
+    /** The secondary's certificate, pinned at pairing; null if not paired. */
+    @Volatile private var fingerprint: String? = null
 
     /** The endpoint whose identity has been checked; null while offline. */
     @Volatile private var verified: Endpoint? = null
@@ -105,9 +109,9 @@ class SecondaryLink(
         flushDone.first { it >= n }
     }
 
-    fun setToken(t: String?) {
-        if (t == token) return
-        token = t
+    fun setFingerprint(f: String?) {
+        if (f == fingerprint) return
+        fingerprint = f
         verified = null
         wake.trySend(Unit)
     }
@@ -140,14 +144,14 @@ class SecondaryLink(
 
         while (kotlin.coroutines.coroutineContext.isActive) {
             val ep = endpoint
-            val tok = token
-            if (ep == null || tok == null) {
-                publish(if (tok == null) LinkStatus(notPaired = true, error = "not paired") else LinkStatus(error = "not found yet"))
+            val pin = fingerprint
+            if (ep == null || pin == null) {
+                publish(if (pin == null) LinkStatus(notPaired = true, error = "not paired") else LinkStatus(error = "not found yet"))
                 wake.receive()
                 continue
             }
             try {
-                val client = SecondaryClient(ep, tok)
+                val client = SecondaryClient(ep, Tls.pinned(pin))
                 if (verified != ep) {
                     val info = client.info()
                     if (info.uuid != uuid) throw IOException("a different device answers at $ep")
@@ -216,8 +220,13 @@ class SecondaryLink(
                     if (applied != null && (st.fileId != applied.fileId || st.page != applied.page)) applied = null
                     if (st.tools != appliedTools) appliedTools = null
                 }
+            } catch (e: KeyChangedException) {
+                // Only a new pairing (setFingerprint) helps; wait for it.
+                verified = null
+                publish(LinkStatus(notPaired = true, keyChanged = true, error = "new key"))
+                wake.receive()
             } catch (e: NotPairedException) {
-                // Only a new pairing (setToken) helps; wait for it.
+                // Only a new pairing (setFingerprint) helps; wait for it.
                 verified = null
                 publish(LinkStatus(online = true, notPaired = true, error = "not paired"))
                 wake.receive()
@@ -235,7 +244,8 @@ class SecondaryLink(
         var polled: Endpoint? = null
         while (kotlin.coroutines.coroutineContext.isActive) {
             val ep = verified
-            if (ep == null) {
+            val pin = fingerprint
+            if (ep == null || pin == null) {
                 delay(500)
                 continue
             }
@@ -244,7 +254,7 @@ class SecondaryLink(
                 polled = ep
             }
             try {
-                val (seq, events) = SecondaryClient(ep, token).input(after)
+                val (seq, events) = SecondaryClient(ep, Tls.pinned(pin)).input(after)
                 after = seq
                 events.forEach(onInput)
             } catch (e: IOException) {

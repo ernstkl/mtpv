@@ -18,9 +18,9 @@ enum class Role { NONE, CONTROLLER, SECONDARY }
 
 /**
  * A secondary as the controller remembers it. Host and port may be outdated; the UUID is the identity.
- * [token] is the secret the secondary handed out when it was paired with this controller.
+ * [fingerprint] is its certificate's, pinned when it was paired with this controller; null if not paired.
  */
-data class KnownSecondary(val uuid: String, val name: String, val host: String?, val port: Int, val token: String? = null)
+data class KnownSecondary(val uuid: String, val name: String, val host: String?, val port: Int, val fingerprint: String? = null)
 
 /** A controller this secondary accepts commands from (secondary side), known by its certificate's [fingerprint]. */
 data class PairedController(val uuid: String, val name: String, val fingerprint: String)
@@ -109,7 +109,7 @@ class Prefs(private val context: Context) {
                 List(a.length()) { a.getJSONObject(it) }.map {
                     KnownSecondary(
                         it.getString("uuid"), it.getString("name"), it.optString("host").ifEmpty { null }, it.optInt("port"),
-                        it.optString("token").ifEmpty { null },
+                        it.optString("fingerprint").ifEmpty { null },
                     )
                 }
             }
@@ -128,7 +128,7 @@ class Prefs(private val context: Context) {
         s.known.values.forEach {
             known.put(
                 JSONObject().put("uuid", it.uuid).put("name", it.name).put("host", it.host ?: "").put("port", it.port)
-                    .put("token", it.token ?: "")
+                    .put("fingerprint", it.fingerprint ?: "")
             )
         }
         sp.edit()

@@ -11,8 +11,8 @@ import java.util.zip.ZipOutputStream
 /**
  * All app data worth keeping, as one zip file: the notes (filesDir/notes), the set records
  * (filesDir/sets: order, ticks, notes IDs), the settings, and a manifest with the format version.
- * Not the PDFs, which come from the set folders again, nor pairing tokens or folder grants, which
- * do not survive a reinstall anyway. The caller writes and reads the JSON of [MANIFEST] and [SETTINGS].
+ * Not the PDFs, which come from the set folders again, nor pairings (the device keys) or folder
+ * grants, which do not survive a reinstall anyway. The caller writes and reads the JSON of [MANIFEST] and [SETTINGS].
  */
 object Backup {
     const val FORMAT = 1
