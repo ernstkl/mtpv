@@ -357,8 +357,8 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { rt.move(slot, -1) }, enabled = slot > 0) { Text("◀") }
-                        TextButton(onClick = { rt.move(slot, +1) }, enabled = slot < s.arrangement.lastIndex) { Text("▶") }
+                        TextButton(onClick = { rt.move(slot, -1) }, enabled = slot > 0) { Text("◀\uFE0E") } // U+FE0E: text, not emoji
+                        TextButton(onClick = { rt.move(slot, +1) }, enabled = slot < s.arrangement.lastIndex) { Text("▶\uFE0E") }
                         if (id != Paging.SELF) {
                             if (st.links[id]?.notPaired == true) TextButton(onClick = { rt.pair(id) }) { Text("Pair") }
                             TextButton(onClick = { rt.exclude(id) }) { Text("Remove") }
