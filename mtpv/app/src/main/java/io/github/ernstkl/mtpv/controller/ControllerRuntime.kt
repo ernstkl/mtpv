@@ -804,6 +804,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 arrangement = if (k.uuid in s.arrangement) s.arrangement else s.arrangement + k.uuid,
             )
         }
+        links[k.uuid]?.first?.repaired()
     }
 
     fun render(fileId: String?, page: Int, w: Int, h: Int, dark: Boolean) = app.renderers.render(fileId, page, w, h, dark)

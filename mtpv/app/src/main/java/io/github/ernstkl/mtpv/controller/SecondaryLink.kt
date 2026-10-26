@@ -118,6 +118,15 @@ class SecondaryLink(
         wake.trySend(Unit)
     }
 
+    /**
+     * Paired again: tries at once. A link refused as not paired waits for this, since pairing again
+     * with the same secondary keeps its fingerprint, so [setFingerprint] does not wake it.
+     */
+    fun repaired() {
+        verified = null
+        wake.trySend(Unit)
+    }
+
     fun setEndpoint(ep: Endpoint?) {
         if (ep == endpoint) return
         endpoint = ep
@@ -237,7 +246,7 @@ class SecondaryLink(
                 publish(LinkStatus(notPaired = true, keyChanged = true, error = "new key"))
                 wake.receive()
             } catch (e: NotPairedException) {
-                // Only a new pairing (setFingerprint) helps; wait for it.
+                // Only a new pairing (setFingerprint, repaired) helps; wait for it.
                 verified = null
                 publish(LinkStatus(online = true, notPaired = true, error = "not paired"))
                 wake.receive()
