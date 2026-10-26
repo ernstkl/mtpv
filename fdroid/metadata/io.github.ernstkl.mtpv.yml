@@ -10,14 +10,17 @@ AutoName: MTPV
 
 RepoType: git
 Repo: https://github.com/ernstkl/mtpv.git
+Binaries: https://github.com/ernstkl/mtpv/releases/download/v%v/mtpv-%v.apk
 
 Builds:
   - versionName: 0.9.0
     versionCode: 1
-    commit: 39a0ddbee80bf33211bda0335e122eeb1ec0ef12
+    commit: d23f279426f342a360b95ee1a732a7024af6f044
     subdir: mtpv/app
     gradle:
       - yes
+
+AllowedAPKSigningKeys: 68260a8c83d3c9eaf9251231507374b91fe94760348570cfab78ef2b1918b06e
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
