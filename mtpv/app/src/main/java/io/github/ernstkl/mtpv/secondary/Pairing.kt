@@ -2,6 +2,7 @@ package io.github.ernstkl.mtpv.secondary
 
 import io.github.ernstkl.mtpv.PairedController
 import io.github.ernstkl.mtpv.Prefs
+import io.github.ernstkl.mtpv.core.Presence
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
@@ -15,9 +16,10 @@ data class PairRequest(val id: String, val controller: String, val name: String,
  * Which controllers this secondary obeys. A controller asks (POST /v1/pair); the person at this
  * screen sees its name and a code that the controller shows too, and taps Allow. Only then does
  * the controller get a token, which it must send with every other request. Being able to tap this
- * screen is the proof, so a crowded network does not matter.
+ * screen is the proof, so a crowded network does not matter. Paired with a controller, it refuses
+ * others until that one is removed here ([Presence]). [onChange] follows each change of the paired list.
  */
-class Pairing(private val prefs: Prefs) {
+class Pairing(private val prefs: Prefs, private val onChange: () -> Unit) {
     private val random = SecureRandom()
 
     private val _paired = MutableStateFlow(prefs.loadPaired())
@@ -29,8 +31,10 @@ class Pairing(private val prefs: Prefs) {
     /** Answers given on this screen, until the controller has picked them up. */
     private val answers = HashMap<String, PairedController?>()
 
+    /** Null if paired with another controller. */
     @Synchronized
-    fun request(controller: String, name: String): PairRequest {
+    fun request(controller: String, name: String): PairRequest? {
+        if (!Presence.mayPair(_paired.value.map { it.uuid }, controller)) return null
         expire()
         // A repeated request from the same controller replaces its earlier one; few strangers fit on screen.
         val others = _requests.value.filter { it.controller != controller }.takeLast(MAX_PENDING - 1)
@@ -47,6 +51,7 @@ class Pairing(private val prefs: Prefs) {
             val p = PairedController(req.controller, req.name, hex(32))
             _paired.value = _paired.value.filter { it.uuid != req.controller } + p
             prefs.savePaired(_paired.value)
+            onChange()
             p
         } else {
             null
@@ -74,6 +79,7 @@ class Pairing(private val prefs: Prefs) {
     fun remove(uuid: String) {
         _paired.value = _paired.value.filter { it.uuid != uuid }
         prefs.savePaired(_paired.value)
+        onChange()
     }
 
     private fun expire() {

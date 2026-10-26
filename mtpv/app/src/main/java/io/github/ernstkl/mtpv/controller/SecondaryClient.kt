@@ -16,10 +16,14 @@ import java.net.URL
 /** The secondary does not (or no longer) accept this controller; it has to be paired again. */
 class NotPairedException : IOException("not paired")
 
+/** The secondary is paired with another controller. */
+class AlreadyPairedException : IOException("paired with another controller")
+
 /** Blocking calls to one secondary's HTTP API. Every failure is an IOException. */
 class SecondaryClient(private val ep: Endpoint, private val token: String? = null) {
 
-    data class Info(val uuid: String, val name: String)
+    /** [open]: paired with no controller, so it may be paired here. */
+    data class Info(val uuid: String, val name: String, val open: Boolean)
     data class PairStatus(val status: String, val token: String?)
     /** [tools] is null if the secondary sent none it could read. */
     data class State(val fileId: String?, val page: Int, val version: Long, val tools: ToolState?)
@@ -44,13 +48,15 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
     fun info(probe: Boolean = false): Info =
         (if (probe) request("GET", "/v1/info", readTimeoutMs = PROBE_READ_MS, connectTimeoutMs = PROBE_CONNECT_MS)
         else request("GET", "/v1/info")).let { (_, json) ->
-        Info(json.getString("uuid"), json.getString("name"))
+        Info(json.getString("uuid"), json.getString("name"), json.optBoolean("open"))
     }
 
     /** Asks to be paired; returns the request ID and the code both screens show. */
     fun pairRequest(controller: String, name: String): Pair<String, String> {
         val body = JSONObject().put("controller", controller).put("name", name).toString().toByteArray()
-        val (_, json) = request("POST", "/v1/pair", body)
+        val (code, json) = request("POST", "/v1/pair", body, acceptErrors = true)
+        if (code == 409 && json.optString("error") == Protocol.ERR_ALREADY_PAIRED) throw AlreadyPairedException()
+        if (code != 200) throw IOException("POST /v1/pair: HTTP $code")
         return json.getString("requestId") to json.getString("code")
     }
 
@@ -81,9 +87,9 @@ class SecondaryClient(private val ep: Endpoint, private val token: String? = nul
         request("POST", "/v1/tool", ToolSync.toJson(tools).toString().toByteArray())
     }
 
-    /** Asks the secondary to come to the front. */
-    fun front() {
-        request("POST", "/v1/front", ByteArray(0))
+    /** Hands over the code of the direct network, "" if there is none. */
+    fun direct(code: String) {
+        request("POST", "/v1/direct", JSONObject().put("code", code).toString().toByteArray())
     }
 
     /** Waits for page turns and tool picks entered on the secondary; returns the new sequence number and the events. */

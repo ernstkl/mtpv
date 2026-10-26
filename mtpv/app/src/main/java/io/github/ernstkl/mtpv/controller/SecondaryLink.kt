@@ -51,7 +51,8 @@ interface NotesHub {
  * missing, sends the page, and keeps checking it every few seconds. Only the latest target matters,
  * so missed page turns are never replayed. Before a secondary gets a new page, the notes on its
  * current page are fetched and saved, so they are never lost. Once the page is right, note tool and
- * finger switch follow, and requests to come to the front. A second loop forwards page turns and tool picks entered on the secondary to [onInput].
+ * finger switch follow, and the direct network's code. A second loop forwards page turns and tool
+ * picks entered on the secondary to [onInput].
  */
 class SecondaryLink(
     private val uuid: String,
@@ -64,8 +65,7 @@ class SecondaryLink(
 ) {
     @Volatile private var target: Target? = null
     @Volatile private var tools: ToolState? = null
-    /** Time of a pending request to come to the front, or 0. */
-    @Volatile private var frontAt = 0L
+    @Volatile private var directCode: String? = null
     @Volatile private var endpoint: Endpoint? = null
     @Volatile private var token: String? = null
 
@@ -88,9 +88,10 @@ class SecondaryLink(
         wake.trySend(Unit)
     }
 
-    /** Asks the secondary to come to the front, once it shows its page; dropped if that takes too long. */
-    fun bringToFront() {
-        frontAt = System.currentTimeMillis()
+    /** The direct network's code for the secondary ("" for none); sent once per connection and when it changes. */
+    fun setDirectCode(code: String) {
+        if (code == directCode) return
+        directCode = code
         wake.trySend(Unit)
     }
 
@@ -133,6 +134,7 @@ class SecondaryLink(
 
         var applied: Target? = null
         var appliedTools: ToolState? = null
+        var appliedDirect: String? = null
         var files = emptySet<String>()
         var backoff = 1_000L
 
@@ -152,6 +154,7 @@ class SecondaryLink(
                     files = client.files()
                     applied = null
                     appliedTools = null
+                    appliedDirect = null
                     verified = ep
                     publish(LinkStatus(online = true))
                 }
@@ -199,10 +202,10 @@ class SecondaryLink(
                     appliedTools = t
                     continue
                 }
-                val at = frontAt
-                if (at != 0L) {
-                    frontAt = 0L
-                    if (System.currentTimeMillis() - at < FRONT_MAX_AGE_MS) client.front()
+                val d = directCode
+                if (d != null && d != appliedDirect) {
+                    client.direct(d)
+                    appliedDirect = d
                     continue
                 }
                 backoff = 1_000L
@@ -252,7 +255,6 @@ class SecondaryLink(
 
     companion object {
         private const val PING_MS = 3_000L
-        private const val FRONT_MAX_AGE_MS = 10_000L
     }
 }
 

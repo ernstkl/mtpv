@@ -3,10 +3,11 @@ package io.github.ernstkl.mtpv.net
 /**
  * HTTP API offered by a secondary (all JSON):
  *
- *   GET  /v1/info          {uuid, name, apiVersion}                       (open; also how the controller
+ *   GET  /v1/info          {uuid, name, apiVersion, open}                 (open; also how the controller
  *                                                                          finds secondaries by address scan
  *                                                                          on DEFAULT_PORT where mDNS fails)
- *   POST /v1/pair          {controller, name} -> {requestId, code}        (open)
+ *   POST /v1/pair          {controller, name} -> {requestId, code}        (open; 409 already_paired if
+ *                                                                          paired with another controller)
  *   GET  /v1/pair/{id}     {status: pending|allowed|denied|unknown, token} (open; token once, on allowed)
  *
  * All other calls need "Authorization: Bearer <token>" from pairing, else 401 not_paired:
@@ -21,14 +22,21 @@ package io.github.ernstkl.mtpv.net
  *   GET  /v1/notes         {fileId, notesKey, page, baseRev, rev, dirty, strokes}: notes of the shown page
  *   POST /v1/tool          {tool, fingers, dark} -> {tool, fingers, dark}: note tool (a NoteTool name),
  *                          finger switch and dark pages; 400 bad_tool
- *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off" | "dark:on|off" |
- *                          "front", ...]};
- *                          long poll, answers
+ *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off" | "dark:on|off",
+ *                          ...]}; long poll, answers
  *                          as soon as the secondary has input after N, or after INPUT_WAIT_MS with none
- *   POST /v1/front         {} -> {shown}: MTPV came (back) to the front on another screen of the setup.
- *                          If MTPV is not on screen here, the secondary posts a "tap to show"
- *                          notification (Android lets no app jump to the front from the background);
- *                          shown tells whether it was on screen already.
+ *   POST /v1/direct        {code} -> {code}: the code of the controller's direct network (16 digits),
+ *                          "" if it never starts one; 400 bad_code otherwise. Sent once per
+ *                          connection and when it changes. See Direct below.
+ *
+ * On screen only: both roles use the network only while MTPV is on their device's screen. In the
+ * background a secondary's server is stopped and its service unannounced, and a controller drops
+ * its links, discovery and direct network; back on screen they start again and catch up.
+ *
+ * Presence: a secondary paired with a controller is off the market. Only a secondary without one is
+ * open: TXT attribute open=1 and info open=true; controllers list only open secondaries as nearby,
+ * and pairing asks from another controller are refused until that controller is removed on the
+ * secondary.
  *
  * JSON request bodies larger than MAX_JSON_BODY (or with a negative Content-Length) get 413 too_large.
  *
@@ -47,10 +55,10 @@ package io.github.ernstkl.mtpv.net
  * and sends all three with POST /v1/tool (resent when GET /v1/state reports others). A pick on a
  * secondary becomes a "tool:<name>", "fingers:on|off" or "dark:on|off" input event.
  *
- * Front: when MTPV comes (back) to the front on the controller, it sends POST /v1/front to every
- * secondary; on a secondary, that secondary reports a "front" input event and the controller passes
- * it on to itself and the other secondaries. Coming to the front by tapping the "tap to show"
- * notification is no trigger, so the screens do not wake each other in turn.
+ * Direct: where controller and secondary share no Wi-Fi, the controller starts a Wi-Fi Direct group
+ * whose name and password come from its code (core/DirectCode). A secondary that knows the code joins
+ * the group when no controller has reached it for a while, so a secondary paired at home finds the
+ * controller elsewhere without typing. A secondary never paired has the code typed in.
  *
  * During development all devices run the same app version; there are no fallbacks for older ones.
  */
@@ -68,6 +76,8 @@ object Protocol {
     const val ERR_NOTES_UNSAVED = "notes_unsaved"
     const val ERR_NOT_PAIRED = "not_paired"
     const val ERR_TOO_LARGE = "too_large"
+    const val ERR_BAD_CODE = "bad_code"
+    const val ERR_ALREADY_PAIRED = "already_paired"
 }
 
 data class Endpoint(val host: String, val port: Int) {

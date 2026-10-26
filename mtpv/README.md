@@ -2,7 +2,8 @@
 
 One app, two roles. A **controller** tablet opens a PDF and turns pages. Each **secondary** tablet
 shows one page: the screen to the right of the controller shows the next page, and so on.
-A page turn moves every screen by one page.
+A page turn moves every screen by one page. It is made for one person with two or three tablets,
+like a sheet of music spread over several pages.
 
 Architecture overview: [`../CONCEPT.md`](../CONCEPT.md).
 
@@ -34,7 +35,7 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
 
 ## Use
 
-1. Install on all tablets, all on the same Wi-Fi.
+1. Install on all tablets, all on the same Wi-Fi (no shared Wi-Fi: see *Direct network* below).
 2. First start: choose **Controller** on one tablet and **Secondary** on the others. The choice is
    remembered, so later starts go straight into the role. **Device role** in the menu changes it; back
    or Cancel keeps the current role running.
@@ -42,10 +43,15 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    the menu → **Screens** → under
    *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary (both show the same code).
    Paired secondaries are added to the right of the controller; **Screens** sets the order (the
-   controller can be in any position). If a secondary does not appear (mDNS blocked, as on some phone
-   hotspots), **Search network** tries every address of the local network; the controller also does this
-   by itself while a paired secondary cannot be reached. Adding a secondary by IP still works too.
+   controller can be in any position). While **Screens** is open, the controller keeps searching: by
+   mDNS, and every 10 s by trying every address of the local network (for networks where mDNS is
+   blocked, as on some phone hotspots, or misses tablets, as on Android 11). It also tries every
+   address by itself while a paired secondary cannot be reached. Adding a secondary by IP still works too.
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
+   A paired secondary is off the market: other controllers do not list it, and it refuses their
+   pairing until its controller is removed on it (tap its middle or ☰ → *Paired controllers* →
+   **Remove**). So where several people use MTPV in one room, *Nearby* shows only the tablets not
+   paired yet. A secondary can be found only while MTPV is on its screen.
    Then **Open single PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
    For a song set, collect one PDF per song in a folder below the **Library folder** (in the menu under **Library**; folders in
    folders are fine, such as Gigs / 2026 / May) and pick it under **Open set from library…**: the PDFs follow each
@@ -73,12 +79,32 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
 4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
    on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
-5. When MTPV comes (back) to the front on any screen, the other screens follow: where another app
-   is in front, a notification "MTPV: tap to show" appears. (Android does not let an app jump to
-   the front by itself.)
+5. MTPV works on a tablet only while it is on that tablet's screen (which MTPV keeps switched on).
+   Switch to another app and that tablet pauses: nothing runs in the background, so nothing uses the
+   battery after the gig, and there is no notification. Back in MTPV, it reconnects and catches up
+   within seconds; notes written on a secondary meanwhile are kept and reach the controller then.
 6. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
    page and arrangement and reconnects; secondaries keep the last page until it does. If a file of a
    set read from a folder has gone from the PDF cache, the controller reads the folder again.
+
+Direct network: where there is no Wi-Fi the tablets can share (none at the venue, or a guest network
+that keeps devices apart), the controller makes its own, by itself. It starts it when a paired screen
+cannot be reached for about 10 s, or when **Screens** is opened and nothing can be reached. A paired
+secondary has got the network's 16-digit code from the controller and joins when no controller has
+reached it for about 15 s. A tablet already in the network stays in it. So tablets paired at home find each other at the venue without any tap.
+A secondary never paired, with no shared Wi-Fi: tap its middle (or ☰) → **Join direct network…** and
+type the code the controller shows (in **Screens** while the network runs, or menu → **Direct
+network**); it then appears under *Nearby* for pairing. Wi-Fi has to be switched on, but no Wi-Fi
+network is needed, and a home Wi-Fi may stay connected alongside. Once started, the network stays
+while MTPV is on the controller's screen, and comes back after Wi-Fi was switched off and on. When
+MTPV leaves the screen the network stops, on a secondary it is left; both start again at once when
+MTPV is back. Menu → **Direct network**:
+*Start by itself when needed* (on by default), **Start**/**Stop** by hand (Stop holds until the next
+app start), **New code** (secondaries reachable only through the network then need it typed).
+**Leave** on a secondary forgets the code until the controller hands it over again. Android asks once
+to allow *Nearby devices* (Android 12 and older: location; if it then fails, switching location on
+may help): on the controller once screens are paired, on a secondary once it has a code. The code
+only lets a tablet into the network; pairing is still needed to control the screens.
 
 Notes: write with the stylus on any screen; fingers keep turning pages. The tool bar in the
 bottom-left corner picks black/red/blue pen, yellow marker or eraser with one tap; the selected one
@@ -114,6 +140,8 @@ On a secondary, tap the middle of the screen (or ☰ top left) for its address, 
 - Pairing: the controller asks (`POST /v1/pair`), the secondary shows its name and a 4-digit code,
   and tapping Allow there issues a random token. Every other request needs it
   (`Authorization: Bearer …`). Paired controllers can be removed on the secondary (tap the middle or ☰).
+  A paired secondary announces `open=0` (TXT record and `GET /v1/info`) and refuses other controllers
+  with `already_paired`.
 - PDFs are identified by SHA-256 and sent once; both roles keep them in `filesDir/pdfs`
   (100 files / 2 GB, least recently used are removed first; the controller never removes the open set's files).
 - A folder is read through the Storage Access Framework (read access only, kept across restarts; one
@@ -134,19 +162,26 @@ On a secondary, tap the middle of the screen (or ☰ top left) for its address, 
 - The controller runs one `SecondaryLink` per secondary that converges it to its target page,
   uploads the PDF if needed and pings every 3 s. It also keeps a long-poll request (`GET /v1/input`)
   open on each secondary, which answers as soon as someone turns a page or picks a tool there.
-- Bringing MTPV to the front: when MTPV comes to the front on the controller, it sends
-  `POST /v1/front` to each secondary; on a secondary, it reports a `front` event over the long poll
-  and the controller passes it on. A screen not showing MTPV posts a heads-up notification; tapping
-  it brings MTPV to the front without waking the others again.
 - Note tool, finger switch and dark pages work the same way: the controller holds the last ones
   picked on any screen and sends them to every secondary (`POST /v1/tool`).
+- Direct network: a Wi-Fi Direct group the controller creates with `WifiP2pConfig`; the secondaries
+  join it with the same config, without a system dialog. The code is the group's password and
+  defines its name, `DIRECT-mt-MTPV-` plus 4 hex characters from PBKDF2-HMAC-SHA256 of the code (slow,
+  so the broadcast name does not help guessing the code). The controller hands the code to each
+  paired secondary (`POST /v1/direct`, once per connection). The controller is `192.168.49.1`; a
+  secondary reachable both there and on a home Wi-Fi keeps its direct address while it answers.
+  Discovery and the address scan work in the group as on any Wi-Fi; a scan runs as soon as a tablet
+  joins.
 - Folder access: MTPV keeps read access only to the library folder and the open set's folder, and
   gives up the rest (Android allows an app at most 512 such grants).
 
-While a role is active, a foreground service (with a notification) keeps the app running when it is not
-on screen, so a secondary keeps serving and the controller keeps receiving page turns.
+On screen only: there is no service. Each role uses the network only between the activity's
+`onStart` and `onStop` (`resume` and `pause` of the role's runtime). In the background a secondary
+stops its server, its mDNS service and the direct network; the controller drops its links, discovery,
+scans and the direct network. State on disk (session, display, unsaved notes) is untouched, so coming
+back is the same as reconnecting after a break.
 
 ## Not in this version
 
 Encryption (tokens travel in plain HTTP on the local network), redo, exporting a PDF with the notes
-burnt in, NFC as a pairing shortcut, and Wi-Fi Direct.
+burnt in, and NFC as a pairing shortcut.

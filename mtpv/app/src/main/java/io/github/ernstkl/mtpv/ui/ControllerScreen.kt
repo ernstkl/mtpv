@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,8 +48,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.ernstkl.mtpv.controller.ControllerRuntime
 import io.github.ernstkl.mtpv.controller.ControllerState
 import io.github.ernstkl.mtpv.controller.LinkStatus
+import io.github.ernstkl.mtpv.core.DirectCode
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.Paging
+import io.github.ernstkl.mtpv.net.DirectState
+import io.github.ernstkl.mtpv.net.DirectWifi
 import io.github.ernstkl.mtpv.net.Protocol
 import kotlinx.coroutines.launch
 
@@ -69,6 +74,16 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var showScreens by remember { mutableStateOf(false) }
+    var showDirect by remember { mutableStateOf(false) }
+    val direct by rt.direct.state.collectAsStateWithLifecycle()
+    val directCode by rt.directCode.collectAsStateWithLifecycle()
+    val directAuto by rt.directAuto.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // Started, or may start by itself because screens are paired.
+    AskDirectPermission(
+        !DirectWifi.hasPermission(context) && (direct != DirectState.Off || (directAuto && s.arrangement.size > 1)),
+        onAnswered = { if (direct != DirectState.Off) rt.startDirect() },
+    )
     var showSongs by remember { mutableStateOf(false) }
     var showSets by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
@@ -123,6 +138,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     MenuItem("Open single PDF") { menu { picker.launch(arrayOf("application/pdf")) } }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     MenuItem("Screens (${s.arrangement.size})") { menu { showScreens = true } }
+                    MenuItem("Direct network", directSubtitle(direct, directCode, directAuto)) { menu { showDirect = true } }
                     MenuItem("Device role", "Controller") { menu(onLeaveRole) }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     MenuGroup("Library", showLibrary) { showLibrary = !showLibrary }
@@ -196,6 +212,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     }
 
     if (showScreens) ScreensDialog(rt, st) { showScreens = false }
+    if (showDirect) DirectNetworkDialog(rt) { showDirect = false }
     if (showSets) SetsDialog(rt, st, onChooseLibrary = { libraryPicker.launch(null) }) { showSets = false }
     if (showSongs) SongsDialog(rt, st) { showSongs = false }
     if (showAbout) AboutDialog { showAbout = false }
@@ -311,6 +328,10 @@ private fun colorFor(l: LinkStatus?): Color = when {
 @Composable
 private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss: () -> Unit) {
     val s = st.session
+    DisposableEffect(rt) {
+        rt.screensOpened()
+        onDispose(rt::screensClosed)
+    }
     var host by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -372,15 +393,26 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
                     }
                 }
 
+                val direct by rt.direct.state.collectAsStateWithLifecycle()
+                val code by rt.directCode.collectAsStateWithLifecycle()
+                if (direct != DirectState.Off && nearby.isEmpty()) {
+                    SectionDivider()
+                    Text("Direct network on, code ${DirectCode.format(code)}", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "Paired secondaries join it by themselves. Another one: ☰ → Join direct network… on it, " +
+                            "type the code, and it shows up under Nearby.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
                 SectionDivider()
                 Text(
-"Secondaries on the same Wi-Fi appear under Nearby. Pair one, then tap Allow on it. If it does not " +
-                        "appear, tap Search network, or enter the address shown on the secondary.",
+"Secondaries with MTPV on screen appear under Nearby; this keeps searching while it is open. " +
+                        "Pair one, then tap Allow on it. If it does not appear, enter the address shown on it. " +
+                        "Without a shared Wi-Fi, the direct network starts by itself (Direct network in the menu).",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                TextButton(onClick = { rt.scan() }, enabled = !st.scanning) {
-                    Text(if (st.scanning) "Searching…" else "Search network")
-                }
+                Text(if (st.scanning) "Searching the network…" else " ", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(

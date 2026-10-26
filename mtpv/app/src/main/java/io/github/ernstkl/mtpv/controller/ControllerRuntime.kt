@@ -5,10 +5,11 @@ import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import io.github.ernstkl.mtpv.BuildConfig
 import io.github.ernstkl.mtpv.ControllerSession
-import io.github.ernstkl.mtpv.FrontNotification
 import io.github.ernstkl.mtpv.KnownSecondary
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.core.Backup
+import io.github.ernstkl.mtpv.core.DirectAuto
+import io.github.ernstkl.mtpv.core.DirectCode
 import io.github.ernstkl.mtpv.core.FolderFile
 import io.github.ernstkl.mtpv.core.LibraryEntry
 import io.github.ernstkl.mtpv.core.LibraryLevel
@@ -31,6 +32,7 @@ import io.github.ernstkl.mtpv.core.StoredFile
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.moved
+import io.github.ernstkl.mtpv.net.DirectState
 import io.github.ernstkl.mtpv.net.Endpoint
 import io.github.ernstkl.mtpv.net.Protocol
 import kotlinx.coroutines.CancellationException
@@ -54,6 +56,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.security.SecureRandom
 import java.time.LocalDate
 
 /** A pairing in progress: [code] is shown here and on the secondary, where someone taps Allow. */
@@ -128,8 +131,9 @@ data class ControllerState(
 }
 
 /**
- * Controller role: owns the session (PDF, first page, screen arrangement), finds secondaries and
- * keeps one [SecondaryLink] per secondary in the arrangement.
+ * Controller role: owns the session (PDF, first page, screen arrangement) and, while MTPV is on
+ * screen ([resume] to [pause]), finds secondaries and keeps one [SecondaryLink] per secondary in
+ * the arrangement.
  */
 class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private val prefs = app.prefs
@@ -143,11 +147,28 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private val versions = VersionClock({ prefs.lastVersion }, { prefs.lastVersion = it })
     private val links = mutableMapOf<String, Pair<SecondaryLink, Job>>()
     private var discovery: Discovery? = null
+    /** On screen: network in use. Links, discovery, scans and the direct network exist only meanwhile. */
+    private var active = false
+    private var activeJob: Job? = null
     private val scanner = AddressScanner(app)
     private var scanJob: Job? = null
     private var lastScan = 0L
     /** Pause between automatic scans; doubles after each. Lost contact resets it and allows a scan right away. */
     private var scanEvery = SCAN_EVERY_MS
+
+    /**
+     * The direct network, for places without a shared Wi-Fi. [directCode] goes to the paired
+     * secondaries and is shown for others to type. With [directAuto] it starts by itself
+     * ([DirectAuto]), unless stopped by hand in this session. It stops when MTPV leaves the
+     * screen and starts again at once when it is back ([directWanted]).
+     */
+    val direct = DirectGroup(app)
+    private val _directCode = MutableStateFlow(prefs.directCode ?: newCode())
+    val directCode: StateFlow<String> = _directCode
+    private val _directAuto = MutableStateFlow(prefs.directAuto)
+    val directAuto: StateFlow<Boolean> = _directAuto
+    private var directStoppedByHand = false
+    private var directWanted = false
 
     private val _state = MutableStateFlow(ControllerState(
             restoreSession(), tools = prefs.tools, library = prefs.library?.let { LibraryUi(prefs.libraryPath) },
@@ -163,17 +184,45 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     fun start() {
-        discovery = Discovery(app, ::onFound).also { it.start() }
-        syncLinks()
-        scope.launch(Dispatchers.Main) { scanWhileMissing() }
+        scope.launch(Dispatchers.Main) { followDirect() }
         if (_state.value.session.set == null) reloadFolder() else relocateFolder()
     }
 
-    fun stop() {
+    /** MTPV came to the screen (main thread): find the secondaries and bring them in line. */
+    fun resume() {
+        active = true
+        if (directWanted) direct.start(_directCode.value)
+        discovery = Discovery(app, ::onFound, ::onLost).also { it.start() }
+        scanEvery = SCAN_EVERY_MS
+        lastScan = 0L
+        syncLinks()
+        activeJob = scope.launch(Dispatchers.Main) { scanWhileMissing() }
+        if (screensShown) screensJob = scope.launch(Dispatchers.Main) { scanWhileScreens() }
+    }
+
+    /**
+     * MTPV left the screen (main thread): drop links, discovery, scans and the direct network, so
+     * nothing runs in the background. Notes written on a secondary stay there until it is reached again.
+     */
+    fun pause() {
+        active = false
+        activeJob?.cancel()
+        activeJob = null
+        screensJob?.cancel()
+        screensJob = null
+        scanJob?.cancel()
         discovery?.stop()
         discovery = null
-        scope.cancel()
+        directWanted = direct.state.value != DirectState.Off
+        direct.stop()
+        links.values.forEach { it.second.cancel() }
         links.clear()
+        _state.update { it.copy(links = emptyMap(), held = emptyMap(), scanning = false) }
+    }
+
+    fun stop() {
+        pause()
+        scope.cancel()
     }
 
     // --- page turning ---
@@ -480,17 +529,116 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     // --- screens ---
 
+    // --- direct network ---
+
+    fun startDirect() {
+        directStoppedByHand = false
+        direct.start(_directCode.value)
+    }
+
+    /** Stopped by hand: it does not start by itself again until the next start of the app. */
+    fun stopDirect() {
+        directStoppedByHand = true
+        direct.stop()
+    }
+
+    fun setDirectAuto(on: Boolean) {
+        prefs.directAuto = on
+        _directAuto.value = on
+        pushDirectCode()
+    }
+
     /**
-     * Called by discovery (main thread). Known secondaries get their new address; others are only
-     * listed as nearby until they are paired, so strangers on a crowded network never join.
+     * A new code; a running direct network restarts with it. Secondaries reached only through it
+     * drop out and need the new code typed; the others get it handed over.
      */
-    private fun onFound(uuid: String, name: String, ep: Endpoint) {
+    fun newDirectCode() {
+        _directCode.value = newCode()
+        if (direct.state.value != DirectState.Off) direct.start(_directCode.value)
+        pushDirectCode()
+    }
+
+    private var screensShown = false
+    private var screensJob: Job? = null
+
+    /**
+     * Screens was opened: if nothing can be reached here, start the direct network, so the others
+     * can join it. While it is open, look for secondaries all the time: mDNS before Android 14
+     * misses some that come and go (an unpaired one is only there while MTPV is on its screen).
+     */
+    fun screensOpened() {
+        val st = _state.value
+        val start = !directStoppedByHand && DirectAuto.startOnScreens(
+            _directAuto.value, direct.state.value != DirectState.Off, st.links.values.any { it.online }, st.nearby.size,
+        )
+        if (start) startDirect()
+        discovery?.refresh()
+        screensShown = true
+        screensJob?.cancel()
+        if (active) screensJob = scope.launch(Dispatchers.Main) { scanWhileScreens() }
+    }
+
+    fun screensClosed() {
+        screensShown = false
+        screensJob?.cancel()
+        screensJob = null
+    }
+
+    private suspend fun scanWhileScreens() {
+        while (true) {
+            scan()
+            delay(SCREENS_SCAN_MS)
+        }
+    }
+
+    /** What the secondaries get: the code while the network may run, "" otherwise. */
+    private fun directCodeToSend(): String =
+        if (_directAuto.value || direct.state.value != DirectState.Off) _directCode.value else ""
+
+    private fun pushDirectCode() {
+        val code = directCodeToSend()
+        links.values.forEach { it.first.setDirectCode(code) }
+    }
+
+    /** Hands the code on as the network starts or stops; scans when tablets have joined, to find them at once. */
+    private suspend fun followDirect() {
+        var clients = 0
+        direct.state.collect { s ->
+            pushDirectCode()
+            val now = (s as? DirectState.Up)?.clients ?: 0
+            if (now > clients) scope.launch(Dispatchers.Main) {
+                delay(DIRECT_JOIN_SCAN_MS) // The new tablet gets its address first.
+                scan()
+            }
+            clients = now
+        }
+    }
+
+    private fun newCode(): String = DirectCode.generate(SecureRandom()).also { prefs.directCode = it }
+
+    /**
+     * Called by discovery (main thread). Known secondaries get their new address, except that one
+     * reached in the direct network stays there while it answers ([DirectCode.preferAddress]).
+     * Others are listed as nearby only while [open] (paired with no controller), so strangers on a
+     * crowded network never join, and a band's paired tablets do not crowd the list.
+     */
+    private fun onFound(uuid: String, name: String, ep: Endpoint, open: Boolean) {
         val known = _state.value.session.known[uuid]
         if (known != null) {
-            updateSession { s -> s.copy(known = s.known + (uuid to known.copy(name = name, host = ep.host, port = ep.port))) }
-        } else {
+            val online = _state.value.links[uuid]?.online == true
+            val keep = DirectCode.preferAddress(known.host, ep.host, DirectCode.GROUP_PREFIX, online) != ep.host
+            val k = if (keep) known.copy(name = name) else known.copy(name = name, host = ep.host, port = ep.port)
+            updateSession { s -> s.copy(known = s.known + (uuid to k)) }
+        } else if (open) {
             _state.update { it.copy(nearby = it.nearby + (uuid to KnownSecondary(uuid, name, ep.host, ep.port))) }
+        } else {
+            onLost(uuid)
         }
+    }
+
+    /** mDNS lost a secondary: a nearby one is no longer listed, so Pair is not offered for an old address. */
+    private fun onLost(uuid: String) {
+        _state.update { it.copy(nearby = it.nearby - uuid) }
     }
 
     fun addByAddress(host: String, port: Int) {
@@ -500,8 +648,12 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 val ep = Endpoint(host, port)
                 val info = SecondaryClient(ep).info()
                 withContext(Dispatchers.Main) {
-                    onFound(info.uuid, info.name, ep)
-                    if (_state.value.session.known[info.uuid]?.token != null) include(info.uuid) else pair(info.uuid)
+                    onFound(info.uuid, info.name, ep, info.open)
+                    when {
+                        _state.value.session.known[info.uuid]?.token != null -> include(info.uuid)
+                        info.open -> pair(info.uuid)
+                        else -> showMessage(alreadyPaired(info.name))
+                    }
                 }
             } catch (e: Exception) {
                 showMessage("No MTPV secondary at $host:$port (${e.message})")
@@ -513,20 +665,17 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     /**
      * Probes every address of the local networks for secondaries, for networks where mDNS finds
-     * nothing (some hotspots, Wi-Fi Direct). Answers count like discovery results. [manual]: tapped
-     * under Screens, so say when nothing answered.
+     * nothing (some hotspots, Wi-Fi Direct). Answers count like discovery results.
      */
-    fun scan(manual: Boolean = true) {
-        if (scanJob?.isActive == true) return
+    private fun scan() {
+        if (!active || scanJob?.isActive == true) return
         lastScan = System.currentTimeMillis()
         scanJob = scope.launch {
             _state.update { it.copy(scanning = true) }
             try {
-                val r = scanner.scan(Protocol.DEFAULT_PORT) { info, ep ->
-                    withContext(Dispatchers.Main) { onFound(info.uuid, info.name, ep) }
+                scanner.scan(Protocol.DEFAULT_PORT) { info, ep ->
+                    withContext(Dispatchers.Main) { onFound(info.uuid, info.name, ep, info.open) }
                 }
-                if (manual && r.probed == 0) showMessage("Not connected to a local network.")
-                else if (manual && r.found == 0) showMessage("No MTPV secondary answered on this network.")
             } finally {
                 _state.update { it.copy(scanning = false) }
             }
@@ -536,15 +685,24 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     /**
      * Scans now and then while a secondary in the arrangement cannot be reached and mDNS has not
      * found it again; less and less often while it stays away (it may just be switched off).
+     * If it stays away, starts the direct network ([DirectAuto]).
      */
     private suspend fun scanWhileMissing() {
         delay(SCAN_FIRST_MS)
+        /** Since when a screen has been out of reach; null while all answer. */
+        var missingSince: Long? = null
         while (true) {
             val st = _state.value
             val missing = st.session.arrangement.any { it != Paging.SELF && st.links[it]?.online != true }
-            if (missing && System.currentTimeMillis() - lastScan >= scanEvery) {
-                scan(manual = false)
+            val now = System.currentTimeMillis()
+            if (missing && now - lastScan >= scanEvery) {
+                scan()
                 scanEvery = minOf(scanEvery * 2, SCAN_MAX_MS)
+            }
+            missingSince = if (missing) missingSince ?: now else null
+            val running = direct.state.value != DirectState.Off
+            if (DirectAuto.controllerStart(_directAuto.value, running, directStoppedByHand, missingSince?.let { now - it })) {
+                startDirect()
             }
             delay(SCAN_CHECK_MS)
         }
@@ -597,13 +755,27 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                     delay(1_000)
                 }
                 showMessage("No answer from ${k.name}. Try again, and tap Allow on it.")
+            } catch (e: AlreadyPairedException) {
+                _state.update { it.copy(nearby = it.nearby - uuid) }
+                showMessage(alreadyPaired(k.name))
             } catch (e: IOException) {
-                showMessage("Could not reach ${k.name}: ${e.message}")
+                // Its address may be outdated (a nearby entry from another network): look for it again.
+                val nearby = uuid !in _state.value.session.known
+                if (nearby) _state.update { it.copy(nearby = it.nearby - uuid) }
+                withContext(Dispatchers.Main) { scan() }
+                showMessage(
+                    "Could not reach ${k.name} at $host (${e.message}). Searching the network for it; " +
+                        if (nearby) "pair it when it shows up under Nearby again." else "try again in a moment."
+                )
             } finally {
                 _state.update { if (it.pairing?.uuid == uuid) it.copy(pairing = null) else it }
             }
         }
     }
+
+    private fun alreadyPaired(name: String) =
+        "$name is paired with another controller. To pair it here, remove that controller on $name first " +
+            "(tap its middle or ☰, then Remove under Paired controllers)."
 
     fun cancelPairing() {
         pairJob?.cancel()
@@ -803,14 +975,6 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     private fun count(n: Int, what: String) = if (n == 1) "1 $what" else "$n ${what}s"
 
-    // --- bring MTPV to the front on every screen ---
-
-    /** MTPV came (back) to the front here or on secondary [from]: the other screens follow (main thread). */
-    fun cameToFront(from: String? = null) {
-        if (from != null && !app.inFront) FrontNotification.show(app)
-        links.forEach { (uuid, l) -> if (uuid != from) l.first.bringToFront() }
-    }
-
     fun clearMessage() = _state.update { it.copy(message = null) }
 
     fun showMessage(m: String) = _state.update { it.copy(message = m) }
@@ -836,6 +1000,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             links.remove(uuid)?.second?.cancel()
             _state.update { it.copy(links = it.links - uuid, held = it.held - uuid) }
         }
+        if (!active) return
         s.arrangement.forEachIndexed { slot, uuid ->
             if (uuid == Paging.SELF) return@forEachIndexed
             val link = links.getOrPut(uuid) {
@@ -860,6 +1025,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             }
             link.setTarget(st.targetForSlot(slot))
             link.setTools(st.tools)
+            link.setDirectCode(directCodeToSend())
         }
     }
 
@@ -867,7 +1033,6 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         when (event) {
             "prev" -> prev()
             "next" -> next()
-            FRONT_EVENT -> cameToFront(from = uuid)
             else -> ToolSync.apply(_state.value.tools, event)?.let(::setTools)
         }
     }
@@ -880,6 +1045,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         private const val SCAN_EVERY_MS = 30_000L
         private const val SCAN_MAX_MS = 300_000L
         private const val SCAN_CHECK_MS = 5_000L
-        const val FRONT_EVENT = "front"
+        private const val DIRECT_JOIN_SCAN_MS = 3_000L
+        private const val SCREENS_SCAN_MS = 10_000L
     }
 }

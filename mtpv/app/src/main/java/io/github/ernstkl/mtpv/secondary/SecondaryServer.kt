@@ -1,5 +1,6 @@
 package io.github.ernstkl.mtpv.secondary
 
+import io.github.ernstkl.mtpv.core.DirectCode
 import io.github.ernstkl.mtpv.core.HashMismatchException
 import io.github.ernstkl.mtpv.core.NotesJson
 import io.github.ernstkl.mtpv.core.PagePosition
@@ -32,6 +33,7 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
             s.method == Method.POST && path == "/v1/pair" -> {
                 val body = JSONObject(String(readBody(s), Charsets.UTF_8))
                 val req = rt.pairing.request(body.getString("controller"), body.optString("name").ifEmpty { "Controller" })
+                    ?: return error(Response.Status.CONFLICT, Protocol.ERR_ALREADY_PAIRED, "paired with another controller")
                 return ok(JSONObject().put("requestId", req.id).put("code", req.code))
             }
             s.method == Method.GET && path.startsWith("/v1/pair/") -> return ok(rt.pairing.status(path.removePrefix("/v1/pair/")))
@@ -56,7 +58,14 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime) : NanoHTTPD(p
                 rt.toolsFromController(tools)
                 ok(ToolSync.toJson(tools))
             }
-            s.method == Method.POST && path == "/v1/front" -> ok(JSONObject().put("shown", rt.frontRequested()))
+            s.method == Method.POST && path == "/v1/direct" -> {
+                val code = JSONObject(String(readBody(s), Charsets.UTF_8)).optString("code")
+                if (code.isNotEmpty() && DirectCode.normalize(code) != code) {
+                    return error(Response.Status.BAD_REQUEST, Protocol.ERR_BAD_CODE, null)
+                }
+                rt.directFromController(code.ifEmpty { null })
+                ok(JSONObject().put("code", code))
+            }
             s.method == Method.PUT && path.startsWith("/v1/files/") -> putFile(s, path.removePrefix("/v1/files/"))
             s.method == Method.POST && path == "/v1/display" -> {
                 val body = JSONObject(String(readBody(s), Charsets.UTF_8))

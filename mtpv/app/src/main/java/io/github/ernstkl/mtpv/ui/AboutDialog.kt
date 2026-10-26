@@ -31,14 +31,21 @@ private class AboutSection(val title: String, val summary: String, val details: 
 private val Sections = listOf(
     AboutSection(
         "Setting up",
-        "Same Wi-Fi; extra tablets are Secondary, one is Controller; pair them under Screens.",
+        "Same Wi-Fi (or a direct network); extra tablets are Secondary, one is Controller; pair them under Screens.",
         listOf(
-            "1. Put all tablets in the same Wi-Fi.",
+            "1. Put all tablets in the same Wi-Fi, or see Direct network below.",
             "2. On the extra tablets, choose Secondary.",
             "3. On one tablet, choose Controller and open a PDF. Then Screens → Pair; " +
                 "check that the secondary shows the same code and tap Allow there.",
             "Screens also sets the order of the screens, left to right. " +
-                "If a secondary isn't found, tap Search network there, or enter its address.",
+                "Screens keeps searching while it is open; if a secondary isn't found, enter its address there. " +
+                "MTPV must be on its screen.",
+            "A paired secondary is no longer offered to other controllers. To pair it with another one, " +
+                "remove its controller on it first (☰ → Paired controllers → Remove).",
+            "No shared Wi-Fi? The controller then starts its own direct network, and paired secondaries " +
+                "join it by themselves. Wi-Fi must be on, but no Wi-Fi network is needed.",
+            "A secondary never paired, with no shared Wi-Fi: ☰ → Join direct network… on it, type the code " +
+                "shown on the controller under Screens, then pair as in 3.",
             "Needs Android 10 or newer.",
         ),
     ),
@@ -52,8 +59,8 @@ private val Sections = listOf(
             "The bottom right corner shows where the page is: \"song 2 of 7: page 1 of 3\", " +
                 "the page counted within its song (just \"page 1 of 3\" for a single PDF).",
             "◐ at the top right turns dark pages on or off on all screens: white paper turns dark gray, notes light, colours stay.",
-            "When MTPV comes back to the front on one screen, the screens showing another app " +
-                "get a notification; tap it to bring MTPV back there too.",
+            "MTPV works on a tablet only while it is on screen there. Switched to another app, that tablet " +
+                "pauses and uses no battery; back in MTPV, it catches up within seconds.",
         ),
     ),
     AboutSection(

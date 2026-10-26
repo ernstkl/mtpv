@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -25,9 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.ernstkl.mtpv.core.PageKey
+import io.github.ernstkl.mtpv.net.DirectWifi
 import io.github.ernstkl.mtpv.secondary.SecondaryRuntime
 import kotlinx.coroutines.delay
 
@@ -52,6 +56,9 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
     var showAbout by remember { mutableStateOf(false) }
     val tools by rt.tools.collectAsStateWithLifecycle()
     val notes by rt.notes.collectAsStateWithLifecycle()
+    val joinCode by rt.joinCode.collectAsStateWithLifecycle()
+    // A paired controller handed over its code: the direct network may be needed without a tap here.
+    AskDirectPermission(joinCode != null && !DirectWifi.hasPermission(LocalContext.current), onAnswered = {})
 
     Box(
         Modifier
@@ -114,9 +121,10 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
             onDismissRequest = { showInfo = false },
             title = { Text("This secondary") },
             text = {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     DeviceInfo(rt, connected)
                     PairedControllers(rt)
+                    DirectJoinSection(rt)
                 }
             },
             confirmButton = { TextButton(onClick = { showInfo = false }) { Text("Close") } },
@@ -154,7 +162,9 @@ private fun PairedControllers(rt: SecondaryRuntime) {
     val paired by rt.pairing.paired.collectAsStateWithLifecycle()
     Spacer(Modifier.height(12.dp))
     Text("Paired controllers", style = MaterialTheme.typography.labelLarge)
-    if (paired.isEmpty()) Text("none")
+    if (paired.isEmpty()) Text("None. Controllers find this tablet while MTPV is on screen here.")
+    else Text("Other controllers do not see this tablet. To pair it with another one, remove this one first.",
+        style = MaterialTheme.typography.bodySmall)
     paired.forEachIndexed { i, p ->
         if (i > 0) HorizontalDivider()
         Row(verticalAlignment = Alignment.CenterVertically) {

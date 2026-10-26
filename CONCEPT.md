@@ -4,6 +4,10 @@ A brief architectural overview. Build, usage and protocol details: [`mtpv/README
 
 ## Model
 
+MTPV is for one person: a set of devices is the equivalent of a multi-page sheet of paper, usually
+two or three tablets. Nobody else waits on that person's screens, which keeps the app simple: it
+works only while it is on screen.
+
 One app with two roles, chosen once per device and restored at every start:
 
 - The **controller** owns the session: the song set, the first page shown, and the arrangement of
@@ -62,7 +66,7 @@ another folder copies the input, not the set. User texts (README, About) say so 
 | `controller/` | mDNS discovery with an address scan as fallback, one `SecondaryLink` per secondary that converges it to its target page, the HTTP client. |
 | `core/` | Role-independent parts: paging and version rules, PDF cache (keyed by SHA-256), notes model and store, `PdfRenderer` wrapper. |
 | `ui/` | Compose screens for both roles, the page view with its notes layer, tap zones and pedal keys. |
-| top level | `MtpvApp` holds the active role, `KeepAliveService` keeps the process alive, `Prefs` persists role and session. |
+| top level | `MtpvApp` holds the active role and resumes or pauses it as MTPV comes to or leaves the screen, `Prefs` persists role and session. |
 
 ## Design choices
 
@@ -92,6 +96,9 @@ another folder copies the input, not the set. User texts (README, About) say so 
   another page. Strokes are vectors in page-relative coordinates, independent of screen size.
 - **Explicit pairing.** A secondary obeys only controllers it has allowed once (code shown on both
   devices, token issued). Several MTPV setups can share one network.
+- **On screen only.** A role uses the network only while MTPV is on its device's screen: no
+  service, no notifications, nothing in the background. Leaving the screen pauses that device;
+  coming back reconnects it like after any break, which the rules above already make safe.
 - **Local network only.** Plain HTTP and mDNS on the same Wi-Fi; no cloud, no Google Play Services.
 
 ## Why a standalone app

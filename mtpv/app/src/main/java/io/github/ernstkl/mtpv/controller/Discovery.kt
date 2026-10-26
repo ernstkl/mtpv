@@ -13,13 +13,16 @@ import java.net.InetAddress
 import java.net.Inet4Address
 
 /**
- * Finds secondaries via mDNS/DNS-SD. [onFound] runs on the main thread, also when an address changes.
+ * Finds secondaries via mDNS/DNS-SD. [onFound] runs on the main thread, also when an address changes,
+ * with whether the secondary is open for pairing;
+ * [onLost] when a secondary's service is gone (switched off, or left the network).
  * Android 14 watches each service and reports address changes by itself. Older versions resolve one
  * service at a time, once; [refresh] resolves them all again, e.g. when a secondary stops answering.
  */
 class Discovery(
     context: Context,
-    private val onFound: (uuid: String, name: String, endpoint: Endpoint) -> Unit,
+    private val onFound: (uuid: String, name: String, endpoint: Endpoint, open: Boolean) -> Unit,
+    private val onLost: (uuid: String) -> Unit,
 ) {
     private val nsd = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     private val executor = context.mainExecutor
@@ -32,6 +35,9 @@ class Discovery(
     private val found = mutableMapOf<String, NsdServiceInfo>()
     private val queue = ArrayDeque<String>()
     private var resolving = false
+
+    /** UUID of each service reported, by service name: a lost service only comes with its name. */
+    private val uuids = mutableMapOf<String, String>()
 
     private val discovery = object : NsdManager.DiscoveryListener {
         override fun onDiscoveryStarted(serviceType: String) = Unit
@@ -48,6 +54,8 @@ class Discovery(
         override fun onServiceLost(info: NsdServiceInfo) {
             executor.execute {
                 if (watching) unwatch(info.serviceName) else found.remove(info.serviceName)
+                // A secondary that announced itself anew (open or not) may be listed under its new name already.
+                if (running) uuids.remove(info.serviceName)?.takeIf { it !in uuids.values }?.let(onLost)
             }
         }
     }
@@ -63,6 +71,7 @@ class Discovery(
         if (watching) callbacks.keys.toList().forEach(::unwatch)
         found.clear()
         queue.clear()
+        uuids.clear()
     }
 
     /** Resolves all services again (before Android 14; there addresses are kept up to date anyway). */
@@ -75,7 +84,8 @@ class Discovery(
         val uuid = info.attributes["uuid"]?.decodeToString() ?: return
         val name = info.attributes["name"]?.decodeToString() ?: info.serviceName
         val host = addr?.hostAddress ?: return
-        onFound(uuid, name, Endpoint(host, info.port))
+        uuids[info.serviceName] = uuid
+        onFound(uuid, name, Endpoint(host, info.port), info.attributes["open"]?.decodeToString() == "1")
     }
 
     // --- Android 14: watch each service ---

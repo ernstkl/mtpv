@@ -81,6 +81,21 @@ class Prefs(private val context: Context) {
             sp.edit().putString("libraryPath", a.toString()).apply()
         }
 
+    /** Controller: the code of its direct network, kept until New code; null until first needed. */
+    var directCode: String?
+        get() = sp.getString("directCode", null)
+        set(value) = sp.edit().putString("directCode", value).apply()
+
+    /** Controller: the direct network starts by itself when the screens cannot be reached otherwise. */
+    var directAuto: Boolean
+        get() = sp.getBoolean("directAuto", true)
+        set(value) = sp.edit().putBoolean("directAuto", value).apply()
+
+    /** Secondary: the code of the direct network it joined last, null after Leave. */
+    var directJoin: String?
+        get() = sp.getString("directJoin", null)
+        set(value) = sp.edit().putString("directJoin", value).apply()
+
     var lastVersion: Long
         get() = sp.getLong("lastVersion", 0)
         set(value) = sp.edit().putLong("lastVersion", value).apply()

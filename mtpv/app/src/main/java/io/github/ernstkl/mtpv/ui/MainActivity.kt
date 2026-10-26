@@ -1,16 +1,12 @@
 package io.github.ernstkl.mtpv.ui
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -37,22 +33,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import io.github.ernstkl.mtpv.FrontNotification
-import io.github.ernstkl.mtpv.KeepAliveService
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.Prefs
 import io.github.ernstkl.mtpv.Role
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val app get() = application as MtpvApp
-
-    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    private var askedForNotifications = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,54 +73,17 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (savedInstanceState == null) handleOpenIntent(intent)
-
-        // Foreground services may only be started while visible, so (re)start it from here.
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                app.role.collect { role ->
-                    KeepAliveService.update(this@MainActivity, role)
-                    if (role != Role.NONE) askForNotifications()
-                }
-            }
-        }
     }
 
-    /** Set in onStart, handled in onResume: by then onNewIntent has delivered the intent that brought us here. */
-    private var cameToFront = false
-
+    /** MTPV works only while on screen: the role resumes here and pauses in [onStop]. */
     override fun onStart() {
         super.onStart()
         app.inFront = true
-        FrontNotification.cancel(this)
-        cameToFront = true
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (!cameToFront) return
-        cameToFront = false
-        // Brought here by the "tap to show" notification: the others were woken already.
-        if (intent.getBooleanExtra(FrontNotification.EXTRA_FROM_NOTIFICATION, false)) {
-            intent.removeExtra(FrontNotification.EXTRA_FROM_NOTIFICATION)
-            return
-        }
-        app.controller?.cameToFront()
-        app.secondary?.cameToFront()
     }
 
     override fun onStop() {
         app.inFront = false
         super.onStop()
-    }
-
-    /** Without this permission the service still runs, but its notification is hidden. */
-    private fun askForNotifications() {
-        if (askedForNotifications) return
-        askedForNotifications = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
     }
 
     override fun onNewIntent(intent: Intent) {

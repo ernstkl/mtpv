@@ -4,19 +4,22 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import io.github.ernstkl.mtpv.DisplayState
-import io.github.ernstkl.mtpv.FrontNotification
 import io.github.ernstkl.mtpv.MtpvApp
-import io.github.ernstkl.mtpv.controller.ControllerRuntime
+import io.github.ernstkl.mtpv.core.DirectAuto
 import io.github.ernstkl.mtpv.core.NoteTool
 import io.github.ernstkl.mtpv.core.NotesJson
 import io.github.ernstkl.mtpv.core.PageKey
 import io.github.ernstkl.mtpv.core.PagePosition
+import io.github.ernstkl.mtpv.core.Presence
 import io.github.ernstkl.mtpv.core.Stroke
 import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.VersionGate
+import io.github.ernstkl.mtpv.net.DirectState
 import io.github.ernstkl.mtpv.net.Protocol
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +29,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.Inet4Address
+import java.net.NetworkInterface
 
 /**
  * Notes of the page a secondary shows; [notesKey] names the song they belong to on the controller.
@@ -42,12 +46,15 @@ data class ShownNotes(
     val strokes: List<Stroke>,
 )
 
-/** Secondary role: serves the HTTP API, announces it via mDNS and holds what the screen shows. */
+/**
+ * Secondary role: holds what the screen shows and, while MTPV is on screen ([resume] to [pause]),
+ * serves the HTTP API and announces it via mDNS.
+ */
 class SecondaryRuntime(private val app: MtpvApp) {
     val cache = app.cache
     private val prefs = app.prefs
     private val nsd = app.getSystemService(Context.NSD_SERVICE) as NsdManager
-    val pairing = Pairing(prefs)
+    val pairing = Pairing(prefs) { main.post(::updatePresence) }
 
     private val _display = MutableStateFlow(prefs.loadDisplay())
     val display: StateFlow<DisplayState> = _display
@@ -67,37 +74,111 @@ class SecondaryRuntime(private val app: MtpvApp) {
     private val _lastContact = MutableStateFlow(0L)
     val lastContact: StateFlow<Long> = _lastContact
 
+    /**
+     * The controller's direct network. Its code ([joinCode]) comes from the controller or is typed
+     * here, and is remembered until Leave; the network is joined when no controller reaches this
+     * device otherwise ([DirectAuto]). Left in the background, joined again at once when back.
+     */
+    val direct = DirectJoin(app)
+    private val _joinCode = MutableStateFlow(prefs.directJoin)
+    val joinCode: StateFlow<String?> = _joinCode
+    /** The code was typed here: look for the network until joined, even while a controller reaches this device. */
+    private var manualJoin = false
+    /** In the direct network (or looking for it) when MTPV left the screen. */
+    private var directWanted = false
+    private var resumedAt = 0L
+    private val main = Handler(Looper.getMainLooper())
+    private val checkDirect = object : Runnable {
+        override fun run() {
+            val joined = direct.state.value is DirectState.Up
+            if (joined) manualJoin = false
+            val since = System.currentTimeMillis() - maxOf(_lastContact.value, resumedAt)
+            val code = _joinCode.value
+            when (DirectAuto.secondary(code, direct.state.value != DirectState.Off, joined, manualJoin, since)) {
+                DirectAuto.Join.START -> code?.let(direct::start)
+                DirectAuto.Join.STOP -> direct.stop()
+                DirectAuto.Join.NONE -> Unit
+            }
+            main.postDelayed(this, DIRECT_CHECK_MS)
+        }
+    }
+
     private var server: SecondaryServer? = null
     var port: Int = 0
         private set
 
-    private val registration = object : NsdManager.RegistrationListener {
-        override fun onServiceRegistered(info: NsdServiceInfo) {
-            Log.i(TAG, "registered ${info.serviceName}")
-        }
-        override fun onRegistrationFailed(info: NsdServiceInfo, code: Int) {
-            Log.w(TAG, "mDNS registration failed: $code")
-        }
-        override fun onServiceUnregistered(info: NsdServiceInfo) = Unit
-        override fun onUnregistrationFailed(info: NsdServiceInfo, code: Int) = Unit
-    }
-    private var registered = false
+    /** The current mDNS registration (a listener serves one registration only), and whether it says open. */
+    private var registration: NsdManager.RegistrationListener? = null
+    private var announcedOpen = false
+    private var active = false
 
-    fun start() {
-        server = startServer()
-        port = server?.listeningPort ?: 0
-        if (port > 0) {
-            val info = NsdServiceInfo().apply {
-                serviceName = "MTPV ${prefs.deviceName} ${prefs.deviceUuid.take(4)}"
-                serviceType = Protocol.SERVICE_TYPE
-                port = this@SecondaryRuntime.port
-                setAttribute("uuid", prefs.deviceUuid)
-                setAttribute("name", prefs.deviceName)
-                setAttribute("api", Protocol.API_VERSION.toString())
-            }
-            nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, registration)
-            registered = true
+    /** MTPV came to the screen (main thread): listen, announce, and rejoin the direct network it was in. */
+    fun resume() {
+        active = true
+        resumedAt = System.currentTimeMillis()
+        updatePresence()
+        val code = _joinCode.value
+        if (directWanted && code != null) direct.start(code)
+        main.postDelayed(checkDirect, DIRECT_CHECK_MS)
+    }
+
+    /** MTPV left the screen (main thread): stop everything, so nothing runs in the background. */
+    fun pause() {
+        active = false
+        main.removeCallbacks(checkDirect)
+        directWanted = direct.state.value != DirectState.Off
+        direct.stop()
+        unannounce()
+        server?.stop()
+        server = null
+    }
+
+    /**
+     * Server and mDNS while on screen (main thread): on resume, and when a controller is paired or
+     * removed, which changes the announced [Presence.open].
+     */
+    private fun updatePresence() {
+        if (!active) return
+        val paired = pairing.paired.value.map { it.uuid }
+        if (server == null) {
+            server = startServer()
+            port = server?.listeningPort ?: 0
         }
+        val open = Presence.open(paired)
+        if (port > 0 && (registration == null || announcedOpen != open)) {
+            unannounce()
+            announce(open)
+        }
+    }
+
+    private fun announce(open: Boolean) {
+        val info = NsdServiceInfo().apply {
+            serviceName = "MTPV ${prefs.deviceName} ${prefs.deviceUuid.take(4)}"
+            serviceType = Protocol.SERVICE_TYPE
+            port = this@SecondaryRuntime.port
+            setAttribute("uuid", prefs.deviceUuid)
+            setAttribute("name", prefs.deviceName)
+            setAttribute("api", Protocol.API_VERSION.toString())
+            setAttribute("open", if (open) "1" else "0")
+        }
+        val listener = object : NsdManager.RegistrationListener {
+            override fun onServiceRegistered(info: NsdServiceInfo) {
+                Log.i(TAG, "registered ${info.serviceName}")
+            }
+            override fun onRegistrationFailed(info: NsdServiceInfo, code: Int) {
+                Log.w(TAG, "mDNS registration failed: $code")
+            }
+            override fun onServiceUnregistered(info: NsdServiceInfo) = Unit
+            override fun onUnregistrationFailed(info: NsdServiceInfo, code: Int) = Unit
+        }
+        nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener)
+        registration = listener
+        announcedOpen = open
+    }
+
+    private fun unannounce() {
+        registration?.let { runCatching { nsd.unregisterService(it) } }
+        registration = null
     }
 
     /** The fixed port makes manual entry predictable; fall back to any free port. */
@@ -112,11 +193,32 @@ class SecondaryRuntime(private val app: MtpvApp) {
         return null
     }
 
-    fun stop() {
-        if (registered) runCatching { nsd.unregisterService(registration) }
-        registered = false
-        server?.stop()
-        server = null
+    fun stop() = pause()
+
+    /** Typed here: join now. */
+    fun joinDirect(code: String) {
+        prefs.directJoin = code
+        _joinCode.value = code
+        manualJoin = true
+        direct.start(code)
+    }
+
+    /** Leaves and forgets the code; a paired controller hands it over again at its next contact. */
+    fun leaveDirect() {
+        prefs.directJoin = null
+        _joinCode.value = null
+        manualJoin = false
+        direct.stop()
+    }
+
+    /** From a paired controller (server thread): its code, null if it has no direct network. */
+    fun directFromController(code: String?) = main.post {
+        if (code == _joinCode.value) return@post
+        prefs.directJoin = code
+        _joinCode.value = code
+        manualJoin = false
+        // Looking for the old network, or in it: go on with the new one.
+        if (code == null) direct.stop() else if (direct.state.value != DirectState.Off) direct.start(code)
     }
 
     fun onContact() {
@@ -127,6 +229,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         .put("uuid", prefs.deviceUuid)
         .put("name", prefs.deviceName)
         .put("apiVersion", Protocol.API_VERSION)
+        .put("open", Presence.open(pairing.paired.value.map { it.uuid }))
 
     fun stateJson(d: DisplayState = _display.value): JSONObject = JSONObject()
         .put("fileId", d.fileId ?: "")
@@ -263,7 +366,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
     private var inputSeq = 0L
     private val recentInput = ArrayDeque<Pair<Long, String>>()
 
-    /** Queues [action] ("next", "prev", "front" or a tool event) for the controller. */
+    /** Queues [action] ("next", "prev" or a tool event) for the controller. */
     fun sendInput(action: String) = synchronized(inputLock) {
         inputSeq++
         recentInput.addLast(inputSeq to action)
@@ -287,31 +390,29 @@ class SecondaryRuntime(private val app: MtpvApp) {
         JSONObject().put("seq", inputSeq).put("events", JSONArray(events.map { it.second }))
     }
 
-    /** MTPV came (back) to the front here: the controller brings it to the front on the other screens. */
-    fun cameToFront() = sendInput(ControllerRuntime.FRONT_EVENT)
-
-    /** The controller asks to bring MTPV to the front; returns whether it is on screen already. */
-    fun frontRequested(): Boolean {
-        val shown = app.inFront
-        if (!shown) FrontNotification.show(app)
-        return shown
-    }
-
     fun afterStore(id: String) {
         cache.evict(setOfNotNull(id, _display.value.fileId))
     }
 
     fun render(fileId: String?, page: Int, w: Int, h: Int, dark: Boolean) = app.renderers.render(fileId, page, w, h, dark)
 
-    /** IPv4 addresses of this device, shown so the controller can be pointed here by hand. */
+    /**
+     * IPv4 addresses of this device, shown so the controller can be pointed here by hand: in the
+     * Wi-Fi, and in a direct network (not a network that ConnectivityManager lists).
+     */
     fun addresses(): List<String> {
         val cm = app.getSystemService(ConnectivityManager::class.java)
-        val lp = cm.getLinkProperties(cm.activeNetwork) ?: return emptyList()
-        return lp.linkAddresses.map { it.address }.filterIsInstance<Inet4Address>().mapNotNull { it.hostAddress }
+        val wifi = cm.getLinkProperties(cm.activeNetwork)?.linkAddresses.orEmpty().map { it.address }
+        val direct = runCatching {
+            NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().filter { it.name.startsWith("p2p") && it.isUp }
+                .flatMap { it.inetAddresses.toList() }
+        }.getOrDefault(emptyList())
+        return (wifi + direct).filterIsInstance<Inet4Address>().mapNotNull { it.hostAddress }.distinct()
     }
 
     companion object {
         private const val TAG = "MtpvSecondary"
         private const val MAX_STROKE_MS = 15_000L
+        private const val DIRECT_CHECK_MS = 5_000L
     }
 }

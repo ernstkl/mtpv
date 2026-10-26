@@ -20,24 +20,18 @@ class AddressScanner(context: Context) {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
     private val probes = Dispatchers.IO.limitedParallelism(PARALLEL)
 
-    /** Number of addresses probed (0: no local network) and of secondaries that answered. */
-    data class Result(val probed: Int, val found: Int)
-
     /** Calls [onFound] for each secondary that answers on [port], from a background thread. */
-    suspend fun scan(port: Int, onFound: suspend (SecondaryClient.Info, Endpoint) -> Unit): Result {
+    suspend fun scan(port: Int, onFound: suspend (SecondaryClient.Info, Endpoint) -> Unit) {
         val hosts = AddressScan.candidates(locals()).map(AddressScan::format)
-        var found = 0
         coroutineScope {
             hosts.forEach { host ->
                 launch(probes) {
                     val ep = Endpoint(host, port)
                     val info = runCatching { SecondaryClient(ep).info(probe = true) }.getOrNull() ?: return@launch
-                    synchronized(this@AddressScanner) { found++ }
                     onFound(info, ep)
                 }
             }
         }
-        return Result(hosts.size, found)
     }
 
     /** Own IPv4 addresses with their prefix length, on interfaces that are up and not mobile data. */

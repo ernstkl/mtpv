@@ -8,7 +8,10 @@ import io.github.ernstkl.mtpv.secondary.SecondaryRuntime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Holds the one active role. The last role is restored at startup, so the app resumes without any taps. */
+/**
+ * Holds the one active role. The last role is restored at startup, so the app resumes without any taps.
+ * The role uses the network only while MTPV is on screen ([inFront]); in the background it does nothing.
+ */
 class MtpvApp : Application() {
     lateinit var prefs: Prefs
         private set
@@ -22,8 +25,19 @@ class MtpvApp : Application() {
     var secondary: SecondaryRuntime? = null
         private set
 
-    /** MTPV is on screen (MainActivity started). */
-    @Volatile var inFront = false
+    /** MTPV is on screen (MainActivity started): the role resumes, and pauses when it leaves (main thread). */
+    var inFront = false
+        set(on) {
+            if (on == field) return
+            field = on
+            if (on) {
+                controller?.resume()
+                secondary?.resume()
+            } else {
+                controller?.pause()
+                secondary?.pause()
+            }
+        }
 
     private val _role = MutableStateFlow(Role.NONE)
     val role: StateFlow<Role> = _role
@@ -47,8 +61,8 @@ class MtpvApp : Application() {
         secondary = null
         prefs.role = role
         when (role) {
-            Role.CONTROLLER -> controller = ControllerRuntime(this).also { it.start() }
-            Role.SECONDARY -> secondary = SecondaryRuntime(this).also { it.start() }
+            Role.CONTROLLER -> controller = ControllerRuntime(this).also { it.start(); if (inFront) it.resume() }
+            Role.SECONDARY -> secondary = SecondaryRuntime(this).also { if (inFront) it.resume() }
             Role.NONE -> Unit
         }
         _role.value = role
@@ -66,7 +80,7 @@ class MtpvApp : Application() {
         try {
             replace()
         } finally {
-            controller = ControllerRuntime(this).also { it.start() }
+            controller = ControllerRuntime(this).also { it.start(); if (inFront) it.resume() }
             _generation.value++
         }
         return controller
