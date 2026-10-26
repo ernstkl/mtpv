@@ -1,5 +1,7 @@
 package io.github.ernstkl.mtpv.controller
 
+import android.util.Log
+import io.github.ernstkl.mtpv.BuildConfig
 import io.github.ernstkl.mtpv.core.NotesStore
 import io.github.ernstkl.mtpv.core.PagePosition
 import io.github.ernstkl.mtpv.core.PageKey
@@ -176,16 +178,25 @@ class SecondaryLink(
                         files = files + fileId
                     }
                     // Save what was written on the current page before it is replaced.
+                    val t0 = System.nanoTime()
                     val back = client.notes()
+                    val tNotes = System.nanoTime()
                     if (back.dirty && back.notesKey != null && back.page > 0) notes.saveFromSecondary(uuid, back)
                     notes.hold(uuid, null)
                     val key = want.notesKey?.takeIf { fileId != null && want.page > 0 }?.let { PageKey(it, want.page) }
                     key?.let { notes.awaitFree(it, uuid) }
                     val page = key?.let { notes.load(it) }
+                    val t1 = System.nanoTime()
                     val r = client.display(
                         controllerId, versions.next(), fileId, key?.notesKey, want.page, want.position,
                         page?.strokes.orEmpty(), page?.rev ?: 0, back.rev,
                     )
+                    if (BuildConfig.DEBUG) {
+                        val t2 = System.nanoTime()
+                        // Round trips of the page turn's two calls; waiting for notes held elsewhere is left out.
+                        Log.d(TAG, "${uuid.take(4)} page ${want.page}: notes ${(tNotes - t0) / 1_000_000} ms, " +
+                            "display ${(t2 - t1) / 1_000_000} ms, $r")
+                    }
                     when (r) {
                         SecondaryClient.DisplayResult.Ok -> {
                             applied = want
@@ -265,6 +276,7 @@ class SecondaryLink(
 
     companion object {
         private const val PING_MS = 3_000L
+        private const val TAG = "MtpvLink"
     }
 }
 
