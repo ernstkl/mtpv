@@ -14,6 +14,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.InputStream
 import java.net.Socket
+import kotlin.concurrent.thread
 
 /**
  * The secondary's HTTPS API, see [Protocol]. Each connection has its own NanoHTTPD thread, which
@@ -26,6 +27,15 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime, identity: Tls
 
     init {
         setServerSocketFactory(Tls.serverSocketFactory(identity))
+    }
+
+    /**
+     * Closing a TLS socket sends a close_notify, which Android forbids on the main thread, where
+     * pause() stops the server; NanoHTTPD would log that and leave the connections open, still
+     * served in the background. So the closing runs on a thread of its own, waited for briefly.
+     */
+    override fun stop() {
+        thread(name = "mtpv-server-stop") { super.stop() }.join(STOP_WAIT_MS)
     }
 
     override fun createClientHandler(socket: Socket, input: InputStream): ClientHandler {
@@ -164,6 +174,8 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime, identity: Tls
     private class BodyTooLargeException(message: String) : Exception(message)
 
     companion object {
+        private const val STOP_WAIT_MS = 1_000L
+
         fun ok(json: JSONObject): Response = json(Response.Status.OK, json)
 
         fun json(status: Response.Status, json: JSONObject): Response =
