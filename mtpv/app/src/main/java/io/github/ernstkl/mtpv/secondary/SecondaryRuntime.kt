@@ -295,6 +295,22 @@ class SecondaryRuntime(private val app: MtpvApp) {
         return SecondaryServer.ok(stateJson(next))
     }
 
+    /**
+     * Removes the paired controller [uuid]. If it gave the page on screen, the screen clears, notes
+     * not fetched yet included: they are its notes, and it can no longer fetch them. The version
+     * and the edit count stay, so neither goes backwards.
+     */
+    @Synchronized
+    fun removeController(uuid: String) {
+        pairing.remove(uuid)
+        val cur = _display.value
+        if (cur.controller != uuid) return
+        val next = cur.copy(fileId = null, page = 0, position = null)
+        _display.value = next
+        prefs.saveDisplay(next)
+        setShownNotes(ShownNotes(null, null, 0, 0, _notes.value.rev, dirty = false, strokes = emptyList()))
+    }
+
     // --- notes on the shown page ---
 
     /** Replaces the strokes of the shown page after drawing or erasing on this device. */

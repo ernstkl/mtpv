@@ -59,7 +59,7 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
    A paired secondary is off the market: other controllers do not list it, and it refuses their
    pairing until its controller is removed on it (tap its middle or ☰ → *Paired controllers* →
-   **Remove**). So where several people use MTPV in one room, *Nearby* shows only the tablets not
+   **Remove**; this also clears that controller's page and notes from the screen). So where several people use MTPV in one room, *Nearby* shows only the tablets not
    paired yet. A secondary can be found only while MTPV is on its screen.
    Then **Open single PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
    For a song set, collect one PDF per song in a folder below the **Library folder** (in the menu under **Library**; folders in
@@ -155,7 +155,8 @@ On a secondary, tap the middle of the screen (or ☰ top left) for its address, 
   shows it with the controller's name and Allow/Deny. With a device in between, the codes differ, and
   the commitment gives it a single guess. On Allow each side pins the other's fingerprint, and the
   secondary accepts every other request only from that client certificate (else `not_paired`).
-  Paired controllers can be removed on the secondary (tap the middle or ☰).
+  Paired controllers can be removed on the secondary (tap the middle or ☰); if the removed one gave
+  the page on screen, the screen clears, notes it had not fetched yet included.
   A paired secondary announces `open=0` (TXT record and `GET /v1/info`) and refuses other controllers
   with `already_paired`.
 - PDFs are identified by SHA-256 and sent once; both roles keep them in `filesDir/pdfs`

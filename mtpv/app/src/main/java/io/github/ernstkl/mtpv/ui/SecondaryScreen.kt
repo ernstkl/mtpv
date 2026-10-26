@@ -172,7 +172,7 @@ private fun PairedControllers(rt: SecondaryRuntime) {
         if (i > 0) HorizontalDivider()
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${p.name} (${p.uuid.take(4)})", Modifier.weight(1f))
-            TextButton(onClick = { rt.pairing.remove(p.uuid) }) { Text("Remove") }
+            TextButton(onClick = { rt.removeController(p.uuid) }) { Text("Remove") }
         }
     }
 }
