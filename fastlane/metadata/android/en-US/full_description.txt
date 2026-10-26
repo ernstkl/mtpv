@@ -9,7 +9,7 @@
 <li>One page per tablet, in any order you arrange them; screens past the last page stay blank</li>
 <li>Turn pages by tapping the left or right edge of any screen, or with a Bluetooth page-turn pedal (Page Up/Down, arrow keys)</li>
 <li>Song sets: put one PDF per song in a folder of your library and the songs follow each other like one long PDF. Reorder them, or untick songs to skip them; the set keeps its order</li>
-<li>Handwritten notes with a stylus (or a finger) on every screen: pens in three colours, a marker and an eraser. Notes follow the page to whichever screen shows it and never change the PDF itself</li>
+<li>Handwritten notes with finger or stylus on every screen: pens in three colours, a marker and an eraser. Notes follow the page to whichever screen shows it and never change the PDF itself</li>
 <li>Dark pages for dim stages, with staves and stems as strong as on paper</li>
 <li>The PDF is sent to the other tablets automatically and kept there</li>
 <li>Open PDFs from any file manager</li>
