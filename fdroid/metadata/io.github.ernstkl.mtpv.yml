@@ -1,7 +1,8 @@
 Categories:
-  - Reading
   - Music Practice Tool
+  - Reading
 License: GPL-3.0-or-later
+AuthorName: ernstkl
 SourceCode: https://github.com/ernstkl/mtpv
 IssueTracker: https://github.com/ernstkl/mtpv/issues
 
@@ -13,7 +14,7 @@ Repo: https://github.com/ernstkl/mtpv.git
 Builds:
   - versionName: 0.9.0
     versionCode: 1
-    commit: v0.9.0
+    commit: 39a0ddbee80bf33211bda0335e122eeb1ec0ef12
     subdir: mtpv/app
     gradle:
       - yes
