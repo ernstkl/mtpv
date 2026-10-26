@@ -26,6 +26,7 @@ android {
         versionCode = 1
         versionName = "0.9.0"
         buildConfigField("String", "GIT_COMMIT", gitCommit?.let { "\"$it\"" } ?: "null")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // Signs release builds for testers when keystore.properties exists (kept out of git).
@@ -80,4 +81,6 @@ dependencies {
     implementation("sh.calvin.reorderable:reorderable:2.4.3")
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
