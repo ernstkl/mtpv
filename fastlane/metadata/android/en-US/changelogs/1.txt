@@ -1,6 +1,9 @@
 First release.
 - One PDF spread across several tablets, one page per screen
-- Controller and secondary roles in one app, remembered across restarts
+- Song sets from a library folder, with order and skipped songs kept
 - Page turns by tap or Bluetooth pedal from any screen
 - Stylus notes (pens, marker, eraser) that follow their page
+- Dark pages
+- Direct network (Wi-Fi Direct) where there is no shared Wi-Fi
 - Pairing by confirming on the secondary
+- Export and import of all data

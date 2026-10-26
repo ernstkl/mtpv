@@ -6,17 +6,23 @@
 <ul>
 <li>One page per tablet, in any order you arrange them; screens past the last page stay blank</li>
 <li>Turn pages by tapping the left or right edge of any screen, or with a Bluetooth page-turn pedal (Page Up/Down, arrow keys)</li>
-<li>Handwritten notes with a stylus on every screen: pens in three colours, a marker and an eraser. Notes follow the page to whichever screen shows it and never change the PDF itself</li>
+<li>Song sets: put one PDF per song in a folder of your library and the songs follow each other like one long PDF. Reorder them, or untick songs to skip them; the set keeps its order</li>
+<li>Handwritten notes with a stylus (or a finger) on every screen: pens in three colours, a marker and an eraser. Notes follow the page to whichever screen shows it and never change the PDF itself</li>
+<li>Dark pages for dim stages, with staves and stems as strong as on paper</li>
 <li>The PDF is sent to the other tablets automatically and kept there</li>
 <li>Open PDFs from any file manager</li>
-<li>Pairing: a secondary obeys only controllers that were allowed on its own screen, so it works on networks with other MTPV users</li>
+<li>Export and import of all notes and sets, to move to a new tablet</li>
+<li>Pairing: a secondary obeys only controllers that were allowed on its own screen, so it works where other people use MTPV too</li>
 <li>Resumes the last PDF, page and screen arrangement after a restart</li>
 </ul>
+
+<p><b>No Wi-Fi at the venue?</b> The controller then starts its own direct network (Wi-Fi Direct), and tablets paired at home join it by themselves. No router and no internet connection are needed, and nothing leaves your tablets.</p>
 
 <p><b>Requirements</b></p>
 <ul>
 <li>Android 10 or newer on all tablets</li>
-<li>All tablets in the same Wi-Fi network (no internet connection needed, nothing leaves your network)</li>
+<li>Wi-Fi switched on; a shared Wi-Fi network is used when there is one</li>
+<li>MTPV works while it is on screen: nothing runs in the background, so it uses no battery after the gig</li>
 </ul>
 
 <p>The connection between the tablets is plain HTTP inside your local network; pairing tokens are not encrypted in transit.</p>
