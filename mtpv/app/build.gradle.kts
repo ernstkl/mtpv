@@ -23,7 +23,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.9.0"
         buildConfigField("String", "GIT_COMMIT", gitCommit?.let { "\"$it\"" } ?: "null")
     }
 
