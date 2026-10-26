@@ -1,21 +1,41 @@
 package io.github.ernstkl.mtpv.net
 
+import io.github.ernstkl.mtpv.core.PairCode
+
 /**
- * HTTP API offered by a secondary (all JSON):
+ * HTTPS API offered by a secondary (all JSON), TLS 1.3 only, see [Tls]. There is no CA: each device
+ * has its own key with a self-signed certificate, and both sides present theirs. The controller
+ * accepts a secondary's certificate in one of three ways: pinned (a paired secondary: only the
+ * fingerprint stored at pairing), any (GET /v1/info probes: the answer is only a hint, a paired link
+ * checks the UUID again over a pinned connection) or first seen (one pairing: the first certificate,
+ * then only that one). The secondary takes any client certificate and decides by its fingerprint
+ * what the client may do.
  *
- *   GET  /v1/info          {uuid, name, apiVersion, open}                 (open; also how the controller
- *                                                                          finds secondaries by address scan
- *                                                                          on DEFAULT_PORT where mDNS fails)
- *   POST /v1/pair          {controller, name} -> {requestId, code}        (open; 409 already_paired if
- *                                                                          paired with another controller)
- *   GET  /v1/pair/{id}     {status: pending|allowed|denied|unknown, token} (open; token once, on allowed)
+ *   GET  /v1/info          {uuid, name, apiVersion, open}               (any client; also how the controller
+ *                                                                        finds secondaries by address scan
+ *                                                                        on DEFAULT_PORT where mDNS fails)
+ *   POST /v1/pair          {controller, name, commit} -> {requestId, nonce}
+ *                                                                       (any client; 409 already_paired if
+ *                                                                        paired with another controller)
+ *   POST /v1/pair/{id}/nonce {nonce} -> {status}                        (the asking client only; 400 bad_nonce)
+ *   GET  /v1/pair/{id}     {status: pending|allowed|denied|unknown}     (the asking client only)
  *
- * All other calls need "Authorization: Bearer <token>" from pairing, else 401 not_paired:
+ * Pairing is a numeric comparison: both screens show a PAIR_CODE_DIGITS code derived from both
+ * certificates as each side sees them in its TLS session and from two nonces (core/PairCode), so
+ * with someone in the middle the codes differ. The controller sends a commitment to its nonce Nc
+ * (PairCode.commit) first and gets the secondary's nonce Ns, then reveals Nc; the secondary checks it against the
+ * commit (else 400 bad_nonce, and the request is gone) and only then shows the request with its
+ * code. The asking client is the one with the client certificate of the POST /v1/pair; others get
+ * unknown. On Allow the secondary stores the controller's fingerprint, and the controller the
+ * secondary's. Nonces and commit are 32 bytes as lowercase hex.
+ *
+ * All other calls need a paired client certificate, else 401 not_paired:
  *
  *   GET  /v1/files         {files: [id, ...]}
  *   PUT  /v1/files/{id}    raw PDF body; 409 hash_mismatch if the SHA-256 differs from {id}
  *   POST /v1/display       {controller, version, fileId, notesKey, page, song, songs, pages, notes, notesRev,
  *                          savedRev} -> state;
+ *                          401 not_paired if controller is not the paired controller of the client certificate;
  *                          409 stale_version (with current version), 404 unknown_file,
  *                          409 notes_unsaved if the shown page has edits newer than savedRev
  *   GET  /v1/state         {fileId, page, version, controller, tool, fingers, dark}
@@ -64,7 +84,7 @@ package io.github.ernstkl.mtpv.net
  */
 object Protocol {
     const val SERVICE_TYPE = "_mtpv._tcp"
-    const val API_VERSION = 1
+    const val API_VERSION = 2
     const val DEFAULT_PORT = 8765
     const val INPUT_WAIT_MS = 20_000L
     const val MAX_JSON_BODY = 16L * 1024 * 1024
@@ -78,6 +98,9 @@ object Protocol {
     const val ERR_TOO_LARGE = "too_large"
     const val ERR_BAD_CODE = "bad_code"
     const val ERR_ALREADY_PAIRED = "already_paired"
+    const val ERR_BAD_NONCE = "bad_nonce"
+
+    const val PAIR_CODE_DIGITS = PairCode.DIGITS
 }
 
 data class Endpoint(val host: String, val port: Int) {
