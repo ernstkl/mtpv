@@ -14,7 +14,7 @@
 <li>The PDF is sent to the other tablets automatically and kept there</li>
 <li>Open PDFs from any file manager</li>
 <li>Export and import of all notes and sets, to move to a new tablet</li>
-<li>Pairing: a secondary obeys only controllers that were allowed on its own screen, so it works where other people use MTPV too</li>
+<li>Pairing: a secondary obeys only controllers that were allowed on its own screen, after comparing a code on both tablets, so it works where other people use MTPV too</li>
 <li>Resumes the last PDF, page and screen arrangement after a restart</li>
 </ul>
 
@@ -27,4 +27,4 @@
 <li>MTPV works while it is on screen: nothing runs in the background, so it uses no battery after the gig</li>
 </ul>
 
-<p>The connection between the tablets is plain HTTP inside your local network; pairing tokens are not encrypted in transit.</p>
+<p>The connection between the tablets is encrypted (TLS 1.3) and stays inside your local network. Each tablet has its own key, and pairing ties the tablets to each other's keys.</p>

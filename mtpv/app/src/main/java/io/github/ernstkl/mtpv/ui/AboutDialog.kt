@@ -36,7 +36,8 @@ private val Sections = listOf(
             "1. Put all tablets in the same Wi-Fi, or see Direct network below.",
             "2. On the extra tablets, choose Secondary.",
             "3. On one tablet, choose Controller and open a PDF. Then Screens → Pair; " +
-                "check that the secondary shows the same code and tap Allow there.",
+                "check that the secondary shows the same 6-digit code and tap Allow there. " +
+                "Matching codes mean no other device is in between; everything between the tablets is encrypted.",
             "Screens also sets the order of the screens, left to right. " +
                 "Screens keeps searching while it is open; if a secondary isn't found, enter its address there. " +
                 "MTPV must be on its screen.",

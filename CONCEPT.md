@@ -22,7 +22,7 @@ Slot *i* shows page *start + i* of that stream, which the controller maps to a f
 up to the last page. A page turn on any screen moves *start* by one, so every screen moves by one page.
 
 ```
- ┌────────────┐   HTTP (paired, bearer token)   ┌─────────────┐
+ ┌────────────┐    HTTPS (pinned device keys)   ┌─────────────┐
  │ Controller │ ──────────────────────────────▶ │ Secondary 1 │  page n+1
  │  page n    │ ◀── long poll: page turns ───── │ HTTP server │
  │            │ ◀── GET notes ───────────────── │ + mDNS      │
@@ -61,7 +61,7 @@ another folder copies the input, not the set. User texts (README, About) say so 
 
 | Package | Role |
 |---|---|
-| `net/` | `Protocol.kt`: the HTTP API a secondary offers. This is the contract between the roles. |
+| `net/` | `Protocol.kt`: the HTTPS API a secondary offers. This is the contract between the roles. `Tls.kt`: device keys and pinning. |
 | `secondary/` | NanoHTTPD server, mDNS announcement (`_mtpv._tcp`, UUID in TXT), pairing, the shown page and its notes. |
 | `controller/` | mDNS discovery with an address scan as fallback, one `SecondaryLink` per secondary that converges it to its target page, the HTTP client. |
 | `core/` | Role-independent parts: paging and version rules, PDF cache (keyed by SHA-256), notes model and store, `PdfRenderer` wrapper. |
@@ -94,12 +94,14 @@ another folder copies the input, not the set. User texts (README, About) say so 
 - **Single owner for notes.** The controller holds the authoritative copy of all notes. A secondary
   edits only the page it shows; the controller fetches those edits before it gives that secondary
   another page. Strokes are vectors in page-relative coordinates, independent of screen size.
-- **Explicit pairing.** A secondary obeys only controllers it has allowed once (code shown on both
-  devices, token issued). Several MTPV setups can share one network.
+- **Explicit pairing.** A secondary obeys only controllers it has allowed once. Both devices show a
+  code derived from both their keys, so matching codes prove no one is in between; then each pins
+  the other's key. Several MTPV setups can share one network.
 - **On screen only.** A role uses the network only while MTPV is on its device's screen: no
   service, no notifications, nothing in the background. Leaving the screen pauses that device;
   coming back reconnects it like after any break, which the rules above already make safe.
-- **Local network only.** Plain HTTP and mDNS on the same Wi-Fi; no cloud, no Google Play Services.
+- **Local network only.** HTTPS (TLS 1.3) with device keys pinned at pairing, and mDNS, on the same
+  Wi-Fi; no cloud, no Google Play Services.
 
 ## Why a standalone app
 

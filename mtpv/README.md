@@ -50,7 +50,7 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    or Cancel keeps the current role running.
 3. Pair each secondary once: on the controller, tap the middle of the screen (or ☰ top left) to open
    the menu → **Screens** → under
-   *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary (both show the same code).
+   *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary once you have checked that both show the same 6-digit code.
    Paired secondaries are added to the right of the controller; **Screens** sets the order (the
    controller can be in any position). While **Screens** is open, the controller keeps searching: by
    mDNS, and every 10 s by trying every address of the local network (for networks where mDNS is
@@ -144,11 +144,18 @@ On a secondary, tap the middle of the screen (or ☰ top left) for its address, 
 
 ## How it works
 
-- Secondary: HTTP server (NanoHTTPD, port 8765) announced as `_mtpv._tcp` via `NsdManager`,
+- Secondary: HTTPS server (NanoHTTPD, port 8765) announced as `_mtpv._tcp` via `NsdManager`,
   with its UUID in the TXT record. API in `net/Protocol.kt`.
-- Pairing: the controller asks (`POST /v1/pair`), the secondary shows its name and a 4-digit code,
-  and tapping Allow there issues a random token. Every other request needs it
-  (`Authorization: Bearer …`). Paired controllers can be removed on the secondary (tap the middle or ☰).
+- Keys: each device makes an EC key in the Android Keystore with a self-signed certificate
+  (`net/Tls.kt`); the private key never leaves the Keystore. All traffic is TLS 1.3, and both sides
+  present their certificate. There is no CA: a device is known by its certificate's SHA-256 fingerprint.
+- Pairing: the controller asks (`POST /v1/pair`) with a commitment to a random nonce and gets the
+  secondary's nonce, then reveals its own (`POST /v1/pair/{id}/nonce`). Both sides derive a 6-digit
+  code from both certificates, as each sees them in its TLS session, and both nonces; the secondary
+  shows it with the controller's name and Allow/Deny. With a device in between, the codes differ, and
+  the commitment gives it a single guess. On Allow each side pins the other's fingerprint, and the
+  secondary accepts every other request only from that client certificate (else `not_paired`).
+  Paired controllers can be removed on the secondary (tap the middle or ☰).
   A paired secondary announces `open=0` (TXT record and `GET /v1/info`) and refuses other controllers
   with `already_paired`.
 - PDFs are identified by SHA-256 and sent once; both roles keep them in `filesDir/pdfs`
@@ -190,7 +197,14 @@ stops its server, its mDNS service and the direct network; the controller drops 
 scans and the direct network. State on disk (session, display, unsaved notes) is untouched, so coming
 back is the same as reconnecting after a break.
 
+Security: everything between the tablets is encrypted (TLS 1.3), PDFs and notes included. Once
+paired, the controller accepts only the secondary's pinned key and the secondary obeys only the
+controller's. Before pairing, the controller accepts any key: when it looks for secondaries
+(`GET /v1/info`), because the answer only lists a tablet and a paired link checks it again over a
+pinned connection, and during pairing, because comparing the codes is what checks the key. The keys
+are not in backups and do not survive a reinstall: a reinstalled secondary shows up as *new key
+(reinstalled?)* under **Screens** and has to be paired again, and so does a reinstalled controller.
+
 ## Not in this version
 
-Encryption (tokens travel in plain HTTP on the local network), redo, exporting a PDF with the notes
-burnt in, and NFC as a pairing shortcut.
+Redo, exporting a PDF with the notes burnt in, and NFC as a pairing shortcut.
