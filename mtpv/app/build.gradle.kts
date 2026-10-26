@@ -6,10 +6,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// The commit this build comes from, "-dirty" when tracked files differ from it; null without git.
+// The commit this build comes from; null without git. No "-dirty" mark: F-Droid edits its checkout
+// before building, and its build must match the signed APK byte for byte (reproducible build).
 val gitCommit = runCatching {
     providers.exec {
-        commandLine("git", "describe", "--always", "--dirty", "--abbrev=7", "--exclude=*")
+        commandLine("git", "describe", "--always", "--abbrev=7", "--exclude=*")
         isIgnoreExitValue = true
     }.standardOutput.asText.get().trim()
 }.getOrNull()?.takeIf { it.isNotEmpty() }

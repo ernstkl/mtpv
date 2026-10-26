@@ -29,7 +29,14 @@ Both passwords are the one you chose when `keytool` asked for it (it asks only o
 PKCS12 keystore shares the store password).
 
 `./gradlew assembleRelease` then writes `app/build/outputs/apk/release/app-release.apk`. Without
-`keystore.properties` it writes `app-release-unsigned.apk`, which F-Droid signs itself.
+`keystore.properties` it writes `app-release-unsigned.apk`.
+
+F-Droid builds are reproducible: F-Droid builds the tagged commit itself and publishes the APK signed
+with this key, but only if its build matches the signed APK from the GitHub release byte for byte.
+A release: raise `versionCode` and `versionName` in `app/build.gradle.kts`, add
+`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`, commit, tag `v<versionName>`, push,
+build `assembleRelease` from a clean checkout of the tag, and attach `app-release.apk` as
+`mtpv-<versionName>.apk` to a GitHub release of that tag. F-Droid finds the tag by itself.
 
 Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10+ (minSdk 29), for both roles. Discovery watches addresses with `registerServiceInfoCallback`
 on Android 14+; older controllers resolve once and resolve again when a secondary stops answering.
