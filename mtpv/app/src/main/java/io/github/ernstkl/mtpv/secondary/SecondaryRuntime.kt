@@ -58,8 +58,16 @@ class SecondaryRuntime(private val app: MtpvApp) {
     private val nsd = app.getSystemService(Context.NSD_SERVICE) as NsdManager
     val pairing = Pairing(prefs) { main.post(::updatePresence) }
 
+    /** The last display command, kept across restarts: its version, and the page its notes belong to. */
     private val _display = MutableStateFlow(prefs.loadDisplay())
-    val display: StateFlow<DisplayState> = _display
+
+    /**
+     * What the screen shows: blank from the start and from each return to the screen until the
+     * controller gives a page again, since meanwhile it may have moved on. A link that drops while
+     * MTPV stays on screen keeps the page.
+     */
+    private val _shown = MutableStateFlow(blank(_display.value))
+    val display: StateFlow<DisplayState> = _shown
 
     private val notesFile = File(app.filesDir, "shown-notes.json")
     private val _notes = MutableStateFlow(loadNotes())
@@ -118,6 +126,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
     fun resume() {
         active = true
         resumedAt = System.currentTimeMillis()
+        synchronized(this) { _shown.value = blank(_display.value) }
         updatePresence()
         val code = _joinCode.value
         if (directWanted && code != null) direct.start(code)
@@ -250,7 +259,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         .put("apiVersion", Protocol.API_VERSION)
         .put("open", Presence.open(pairing.paired.value.map { it.uuid }))
 
-    fun stateJson(d: DisplayState = _display.value): JSONObject = JSONObject()
+    fun stateJson(d: DisplayState = _shown.value): JSONObject = JSONObject()
         .put("fileId", d.fileId ?: "")
         .put("page", d.page)
         .put("version", d.version)
@@ -289,6 +298,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         }
         val next = DisplayState(fileId, page, version, controller, position)
         _display.value = next
+        _shown.value = next
         prefs.saveDisplay(next)
         setShownNotes(ShownNotes(fileId, notesKey, page, notesRev, shown.rev, dirty = false, strokes = notes))
         fileId?.let { cache.touch(it) }
@@ -305,8 +315,9 @@ class SecondaryRuntime(private val app: MtpvApp) {
         pairing.remove(uuid)
         val cur = _display.value
         if (cur.controller != uuid) return
-        val next = cur.copy(fileId = null, page = 0, position = null)
+        val next = blank(cur)
         _display.value = next
+        _shown.value = next
         prefs.saveDisplay(next)
         setShownNotes(ShownNotes(null, null, 0, 0, _notes.value.rev, dirty = false, strokes = emptyList()))
     }
@@ -449,5 +460,8 @@ class SecondaryRuntime(private val app: MtpvApp) {
         private const val TAG = "MtpvSecondary"
         private const val MAX_STROKE_MS = 15_000L
         private const val DIRECT_CHECK_MS = 5_000L
+
+        /** [d] with nothing on screen; version and controller stay. */
+        private fun blank(d: DisplayState) = d.copy(fileId = null, page = 0, position = null)
     }
 }

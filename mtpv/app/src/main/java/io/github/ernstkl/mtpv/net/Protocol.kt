@@ -38,8 +38,11 @@ import io.github.ernstkl.mtpv.core.PairCode
  *                          401 not_paired if controller is not the paired controller of the client certificate;
  *                          409 stale_version (with current version), 404 unknown_file,
  *                          409 notes_unsaved if the shown page has edits newer than savedRev
- *   GET  /v1/state         {fileId, page, version, controller, tool, fingers, dark}
- *   GET  /v1/notes         {fileId, notesKey, page, baseRev, rev, dirty, strokes}: notes of the shown page
+ *   GET  /v1/state         {fileId, page, version, controller, tool, fingers, dark}: fileId and page as shown,
+ *                          so blank ("", 0) from the secondary's start or return to the screen until the
+ *                          next display command
+ *   GET  /v1/notes         {fileId, notesKey, page, baseRev, rev, dirty, strokes}: notes of the page last
+ *                          displayed, also while the screen is blank
  *   POST /v1/tool          {tool, fingers, dark} -> {tool, fingers, dark}: note tool (a NoteTool name),
  *                          finger switch and dark pages; 400 bad_tool
  *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off" | "dark:on|off",
