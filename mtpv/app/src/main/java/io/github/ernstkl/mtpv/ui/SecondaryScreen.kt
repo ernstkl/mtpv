@@ -73,6 +73,7 @@ fun SecondaryScreen(rt: SecondaryRuntime, onLeaveRole: () -> Unit) {
                         else -> showInfo = true
                     }
                 },
+                onSwipe = { next -> rt.sendInput(if (next) "next" else "prev") },
                 onLongPress = { showInfo = true },
             ),
     ) {

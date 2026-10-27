@@ -85,8 +85,8 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    such a file, after asking. To move to another install (a new tablet, or the F-Droid build, which needs
    uninstalling first): export, install, import, then pick the library folder again; each set then gets
    its order, ticks and notes back. Paired screens are not in the file: pair them again.
-4. Turn pages: tap the left/right third of any screen, controller or secondary, or use a Bluetooth pedal
-   on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
+4. Turn pages: tap the left/right third of any screen, controller or secondary, swipe (to the left for the
+   next page, like paper), or use a Bluetooth pedal on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
 5. MTPV works on a tablet only while it is on that tablet's screen (which MTPV keeps switched on).
    Switch to another app and that tablet pauses: nothing runs in the background, so nothing uses the
@@ -118,7 +118,7 @@ Notes: write with the stylus on any screen; fingers keep turning pages. The tool
 bottom-left corner picks black/red/blue pen, yellow marker or eraser with one tap. The eraser removes whole strokes; the stylus eraser end works too. ↶ removes the
 page's strokes one by one, newest first, whichever screen they were drawn on (erasing is not
 undone). Without a stylus, tap the square finger switch at the left of the bar (green = on): a
-finger then draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
+finger then draws like the stylus, and taps and swipes on the page no longer turn it, so use a pedal or switch it off again.
 Tool and finger switch are the same on all screens, like one big sheet of paper: what you pick on
 one screen is picked on all of them. The stylus draws on every screen whatever the switch says.
 Notes belong to the set, not to the PDF: the folder is only what MTPV reads, and MTPV never writes

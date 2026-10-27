@@ -54,7 +54,7 @@ private val Sections = listOf(
     ),
     AboutSection(
         "Turning pages",
-        "Tap the left or right third of any screen, or use a Bluetooth pedal.",
+        "Tap the left or right third of any screen, swipe, or use a Bluetooth pedal.",
         listOf(
             "Every screen moves on by one page, until the last page is on the leftmost screen.",
             "Controller: tap the middle or ☰ for the menu; ♫ next to it lists the songs (only the controller has it). " +
@@ -84,7 +84,7 @@ private val Sections = listOf(
         listOf(
             "Pick pen, marker or eraser in the bar at the bottom left; ↶ undoes.",
             "Without a stylus, tap the square finger button (green = on) to draw with a finger; " +
-                "taps on the page then no longer turn it. Tool and finger button change on all screens at once.",
+                "taps and swipes on the page then no longer turn it. Tool and finger button change on all screens at once.",
             "Notes belong to the song in its set: a new set starts without notes, and a copy of a PDF in another set " +
                 "has notes of its own. Renaming a file keeps its notes; deleting it or changing its content deletes them.",
             "Copy notes from… in the menu takes the notes of the same PDF from another song.",

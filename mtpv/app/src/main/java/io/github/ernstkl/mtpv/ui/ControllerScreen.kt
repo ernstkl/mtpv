@@ -168,7 +168,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                         o.x > size.width * 2 / 3f -> rt.next()
                         else -> scope.launch { drawer.open() }
                     }
-                }),
+                }, onSwipe = { next -> if (next) rt.next() else rt.prev() }),
         ) {
             val own = st.ownTarget
             PageView(own?.fileId, own?.page ?: 0, rt::render, own?.position?.label, dark = st.tools.dark) { fileId, page ->

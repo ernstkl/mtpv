@@ -7,6 +7,7 @@ import android.net.nsd.NsdServiceInfo
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import io.github.ernstkl.mtpv.BuildConfig
 import io.github.ernstkl.mtpv.DisplayState
 import io.github.ernstkl.mtpv.MtpvApp
 import io.github.ernstkl.mtpv.core.DirectAuto
@@ -414,6 +415,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
 
     /** Queues [action] ("next", "prev" or a tool event) for the controller. */
     fun sendInput(action: String) = synchronized(inputLock) {
+        if (BuildConfig.DEBUG) Log.d(TAG, "input $action")
         inputSeq++
         recentInput.addLast(inputSeq to action)
         while (recentInput.size > 20) recentInput.removeFirst()

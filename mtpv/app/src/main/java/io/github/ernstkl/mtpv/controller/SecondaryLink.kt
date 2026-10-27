@@ -274,6 +274,7 @@ class SecondaryLink(
                 polled = ep
             }
             try {
+                if (BuildConfig.DEBUG && after < 0) Log.d(TAG, "${uuid.take(4)} input poll starts at $ep")
                 val (seq, events) = SecondaryClient(ep, Tls.pinned(pin)).input(after)
                 after = seq
                 events.forEach(onInput)

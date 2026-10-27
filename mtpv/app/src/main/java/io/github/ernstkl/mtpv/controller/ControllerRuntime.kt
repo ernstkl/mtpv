@@ -3,6 +3,7 @@ package io.github.ernstkl.mtpv.controller
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import android.util.Log
 import io.github.ernstkl.mtpv.BuildConfig
 import io.github.ernstkl.mtpv.ControllerSession
 import io.github.ernstkl.mtpv.KnownSecondary
@@ -234,6 +235,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun prev() = turn(-1)
 
     private fun turn(delta: Int) = updateSession {
+        if (BuildConfig.DEBUG) Log.d(TAG, "turn $delta from page ${it.start} of ${it.set?.totalPages ?: 0}")
         it.copy(start = it.start + delta)
     }
 
@@ -1050,6 +1052,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     private fun onInput(uuid: String, event: String) {
+        if (BuildConfig.DEBUG) Log.d(TAG, "input from ${uuid.take(4)}: $event")
         when (event) {
             "prev" -> prev()
             "next" -> next()
@@ -1058,6 +1061,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     companion object {
+        private const val TAG = "MtpvController"
         private const val PAIR_TIMEOUT_MS = 60_000L
         private const val FLUSH_TIMEOUT_MS = 5_000L
         /** mDNS gets this long after start before the first scan. */
