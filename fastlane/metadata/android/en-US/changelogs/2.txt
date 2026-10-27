@@ -1,0 +1,5 @@
+- Everything between the tablets is encrypted; pairing compares a 6-digit code on both screens. Tablets with 0.9.0 must be updated and paired again
+- Swipe turns pages; taps work more reliably on older tablets
+- A secondary shows nothing after starting until the controller gives it a page
+- Removing a controller on a secondary clears its page
+- Choosing another library folder closes the open set
