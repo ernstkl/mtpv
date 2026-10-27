@@ -410,8 +410,13 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     private var browseJob: Job? = null
 
-    /** A library folder picked with the system's folder picker; the Sets dialog starts at its top. */
+    /**
+     * A library folder picked with the system's folder picker; the Sets dialog starts at its top.
+     * The open set is closed: it belongs to the library before.
+     */
     fun setLibrary(tree: Uri) {
+        openJob?.cancel()
+        updateSession { it.copy(set = null, folder = null, start = 1) }
         try {
             folders.keepAccess(tree)
         } catch (e: SecurityException) {
@@ -1037,7 +1042,8 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
                 k.host?.let { link.setEndpoint(Endpoint(it, k.port)) }
                 link.setFingerprint(k.fingerprint)
             }
-            link.setTarget(st.targetForSlot(slot))
+            // Without a set to come back to (closed, or none yet), the secondaries go blank.
+            link.setTarget(st.targetForSlot(slot) ?: Target(null, null, 0).takeIf { s.folder == null })
             link.setTools(st.tools)
             link.setDirectCode(directCodeToSend())
         }

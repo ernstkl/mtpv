@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.ernstkl.mtpv.controller.ControllerRuntime
 import io.github.ernstkl.mtpv.controller.ControllerState
@@ -207,7 +208,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
             }
 
             st.busy?.let {
-                Text(it, Modifier.align(Alignment.BottomCenter).background(Color(0xCC000000)).padding(12.dp))
+                Text(it, Modifier.align(Alignment.Center).background(Color(0xCC000000)).padding(24.dp), fontSize = 22.sp)
             }
         }
     }
