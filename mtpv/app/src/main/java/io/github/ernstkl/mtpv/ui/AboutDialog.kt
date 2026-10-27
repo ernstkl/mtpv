@@ -42,7 +42,7 @@ private val Sections = listOf(
                 "Screens keeps searching while it is open; if a secondary isn't found, enter its address there. " +
                 "MTPV must be on its screen.",
             "A paired secondary is no longer offered to other controllers. To pair it with another one, " +
-                "remove its controller on it first (☰ → Paired controllers → Remove); its page and notes then leave the screen.",
+                "remove its controller on it first (☰ → Paired controllers → Remove).",
             "No shared Wi-Fi? The controller then starts its own direct network, and paired secondaries " +
                 "join it by themselves. Wi-Fi must be on, but no Wi-Fi network is needed. Up to Android 12 " +
                 "this needs the location permission; MTPV never reads your location.",

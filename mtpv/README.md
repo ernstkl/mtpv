@@ -59,14 +59,14 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
    A paired secondary is off the market: other controllers do not list it, and it refuses their
    pairing until its controller is removed on it (tap its middle or ☰ → *Paired controllers* →
-   **Remove**; this also clears that controller's page and notes from the screen). So where several people use MTPV in one room, *Nearby* shows only the tablets not
+   **Remove**). So where several people use MTPV in one room, *Nearby* shows only the tablets not
    paired yet. A secondary can be found only while MTPV is on its screen.
    Then **Open single PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
    For a song set, collect one PDF per song in a folder below the **Library folder** (in the menu under **Library**; folders in
    folders are fine, such as Gigs / 2026 / May) and pick it under **Open set from library…**: the PDFs follow each
    other like one long PDF, in alphabetical order (numbers by value, so "2" comes before "10"). Opening
    the same folder again keeps its order; files added since go to the end, removed ones drop out.
-   Files without pages are left out. Subfolders are not included. **Songs** lists the set: tap a song
+   Subfolders are not included. **Songs** lists the set: tap a song
    to show it from the leftmost screen, drag ≡ to change the order, untick a song to leave its pages
    out (it stays in the list, so it can be ticked again). Order and ticks are kept for that folder.
    **Reload folder** picks up added or removed PDFs. The top of the menu shows the song on the leftmost screen.
@@ -74,8 +74,8 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    so it also shows which screen is the controller.
    **Open set from library…** browses the library: a folder without subfolders
    opens as a set at a tap, one with subfolders opens to show them (↑ goes back up), and *Show this
-   folder as a set* opens the PDFs of the folder shown. The open set is marked. Folders starting with
-   "." and folders without PDFs are not shown. A set keeps its order and ticks however it was opened.
+   folder as a set* opens the PDFs of the folder shown. Folders starting with
+   "." and folders without PDFs are not shown.
    A renamed file keeps its place, tick and notes. If the library moves (say from the SD card to
    internal storage), pick it again under **Library folder**: each set found at the same place in it
    keeps its order, ticks and notes.
@@ -93,19 +93,18 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    battery after the gig, and there is no notification. Back in MTPV, it reconnects and catches up
    within seconds; notes written on a secondary meanwhile are kept and reach the controller then.
 6. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
-   page and arrangement and reconnects; secondaries keep the last page until it does. If a file of a
-   set read from a folder has gone from the PDF cache, the controller reads the folder again.
+   page and arrangement and reconnects.
 
 Direct network: where there is no Wi-Fi the tablets can share (none at the venue, or a guest network
 that keeps devices apart), the controller makes its own, by itself. It starts it when a paired screen
 cannot be reached for about 10 s, or when **Screens** is opened and nothing can be reached. A paired
 secondary has got the network's 16-digit code from the controller and joins when no controller has
-reached it for about 15 s. A tablet already in the network stays in it. So tablets paired at home find each other at the venue without any tap.
+reached it for about 15 s. So tablets paired at home find each other at the venue without any tap.
 A secondary never paired, with no shared Wi-Fi: tap its middle (or ☰) → **Join direct network…** and
 type the code the controller shows (in **Screens** while the network runs, or menu → **Direct
 network**); it then appears under *Nearby* for pairing. Wi-Fi has to be switched on, but no Wi-Fi
 network is needed, and a home Wi-Fi may stay connected alongside. Once started, the network stays
-while MTPV is on the controller's screen, and comes back after Wi-Fi was switched off and on. When
+while MTPV is on the controller's screen. When
 MTPV leaves the screen the network stops, on a secondary it is left; both start again at once when
 MTPV is back. Menu → **Direct network**:
 *Start by itself when needed* (on by default), **Start**/**Stop** by hand (Stop holds until the next
@@ -116,8 +115,7 @@ may help): on the controller once screens are paired, on a secondary once it has
 only lets a tablet into the network; pairing is still needed to control the screens.
 
 Notes: write with the stylus on any screen; fingers keep turning pages. The tool bar in the
-bottom-left corner picks black/red/blue pen, yellow marker or eraser with one tap; the selected one
-is underlined. The eraser removes whole strokes; the stylus eraser end works too. ↶ removes the
+bottom-left corner picks black/red/blue pen, yellow marker or eraser with one tap. The eraser removes whole strokes; the stylus eraser end works too. ↶ removes the
 page's strokes one by one, newest first, whichever screen they were drawn on (erasing is not
 undone). Without a stylus, tap the square finger switch at the left of the bar (green = on): a
 finger then draws like the stylus, and taps on the page no longer turn it, so use a pedal or switch it off again.
@@ -136,7 +134,7 @@ the song among the songs shown in the set and the page within that song. A singl
 Dark pages: **◐** at the top right of any screen swaps light and dark on all screens: white paper turns very dark gray, black notes off-white
 (softer than pure black and white, which makes thin lines blur for many eyes).
 Colours keep their hue (red notes stay red); the marker tints the black paper instead of the white.
-The setting is kept across restarts. PdfRenderer has no dark mode, so the rendered page is inverted in linear light
+PdfRenderer has no dark mode, so the rendered page is inverted in linear light
 (not in sRGB values), which keeps thin lines such as staves and stems as strong as on paper.
 
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
