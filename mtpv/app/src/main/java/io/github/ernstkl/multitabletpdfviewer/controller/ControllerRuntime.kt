@@ -118,14 +118,14 @@ data class ControllerState(
     fun pageForSlot(slot: Int) = Paging.pageFor(session.start, slot, totalPages)
 
     /**
-     * Song page for [slot]. A blank screen past the end gets the last shown song's file with page 0,
+     * Song page for [slot]; the leftmost screen gets « and ». A blank screen past the end gets the last shown song's file with page 0,
      * so it shows the empty-set sign. Null while no set is open.
      */
     fun targetForSlot(slot: Int): Target? {
         val set = session.set ?: return null
         val last = set.songs.lastOrNull { !it.excluded } ?: set.songs.last()
         val page = pageForSlot(slot)
-        return set.locate(page)?.let { Target(it.fileId, it.notesKey, it.page, set.positionAt(page)) } ?: Target(last.fileId, null, 0)
+        return set.locate(page)?.let { Target(it.fileId, it.notesKey, it.page, set.positionAt(page)?.copy(skip = slot == 0)) } ?: Target(last.fileId, null, 0)
     }
 
     /** Secondary that still holds unsaved notes of [key] and can be reached, if any. */
@@ -495,6 +495,13 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun jumpToSong(index: Int) = updateSession { s ->
         val set = s.set ?: return@updateSession s
         if (index !in set.songs.indices) s else s.copy(start = set.firstPageOf(index))
+    }
+
+    /** Shows the next (or previous) song from the leftmost screen; past the last (or first) song nothing changes. */
+    fun skipSong(next: Boolean) = updateSession { s ->
+        val set = s.set ?: return@updateSession s
+        val page = if (next) set.nextSongPage(s.start) else set.previousSongPage(s.start)
+        if (page == null) s else s.copy(start = page)
     }
 
     /** Moves a song up or down; the controller's own screen keeps its page. The order is stored for the folder. */
@@ -1070,6 +1077,8 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         when (event) {
             "prev" -> prev()
             "next" -> next()
+            "song:prev" -> skipSong(false)
+            "song:next" -> skipSong(true)
             else -> ToolSync.apply(_state.value.tools, event)?.let(::setTools)
         }
     }

@@ -33,8 +33,8 @@ import io.github.ernstkl.multitabletpdfviewer.core.PairCode
  *
  *   GET  /v1/files         {files: [id, ...]}
  *   PUT  /v1/files/{id}    raw PDF body; 409 hash_mismatch if the SHA-256 differs from {id}
- *   POST /v1/display       {controller, version, fileId, notesKey, page, song, songs, pages, notes, notesRev,
- *                          savedRev} -> state;
+ *   POST /v1/display       {controller, version, fileId, notesKey, page, song, songs, pages, songSkip, notes,
+ *                          notesRev, savedRev} -> state;
  *                          401 not_paired if controller is not the paired controller of the client certificate;
  *                          409 stale_version (with current version), 404 unknown_file,
  *                          409 notes_unsaved if the shown page has edits newer than savedRev
@@ -45,8 +45,8 @@ import io.github.ernstkl.multitabletpdfviewer.core.PairCode
  *                          displayed, also while the screen is blank
  *   POST /v1/tool          {tool, fingers, dark} -> {tool, fingers, dark}: note tool (a NoteTool name),
  *                          finger switch and dark pages; 400 bad_tool
- *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "tool:<name>" | "fingers:on|off" | "dark:on|off",
- *                          ...]}; long poll, answers
+ *   GET  /v1/input?after=N {seq, events: ["next" | "prev" | "song:next" | "song:prev" | "tool:<name>" |
+ *                          "fingers:on|off" | "dark:on|off", ...]}; long poll, answers
  *                          as soon as the secondary has input after N, or after INPUT_WAIT_MS with none
  *   POST /v1/direct        {code} -> {code}: the code of the controller's direct network (16 digits),
  *                          "" if it never starts one; 400 bad_code otherwise. Sent once per
@@ -65,7 +65,9 @@ import io.github.ernstkl.multitabletpdfviewer.core.PairCode
  *
  * Pages are 1-based; page 0 (or past the end) shows a blank screen. song of songs (both 1-based) and
  * pages place the page in the set: its song among the songs shown and the song's page count, for the
- * label in the corner; all 0 with a blank page.
+ * bar at the top; all 0 with a blank page. songSkip is true on the leftmost screen only: its bar
+ * offers « and », which send "song:prev" and "song:next" to show the previous or next song from
+ * the leftmost screen.
  *
  * Notes: the controller holds the authoritative copy and sends a page's strokes with the display
  * command. Notes belong to a song, not to the PDF: notesKey names the song's notes ("" with a blank

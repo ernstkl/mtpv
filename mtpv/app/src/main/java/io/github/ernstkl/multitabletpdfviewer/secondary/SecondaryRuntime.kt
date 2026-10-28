@@ -423,7 +423,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
     private var inputSeq = 0L
     private val recentInput = ArrayDeque<Pair<Long, String>>()
 
-    /** Queues [action] ("next", "prev" or a tool event) for the controller. */
+    /** Queues [action] ("next", "prev", "song:next", "song:prev" or a tool event) for the controller. */
     fun sendInput(action: String) = synchronized(inputLock) {
         if (BuildConfig.DEBUG) Log.d(TAG, "input $action")
         inputSeq++

@@ -9,6 +9,7 @@ import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import io.github.ernstkl.multitabletpdfviewer.BuildConfig
 import io.github.ernstkl.multitabletpdfviewer.core.PageGesture
 import io.github.ernstkl.multitabletpdfviewer.core.PageGestures
@@ -17,8 +18,9 @@ import io.github.ernstkl.multitabletpdfviewer.core.PageGestures
  * Finger taps and swipes for page turning ([PageGestures]). Unlike detectTapGestures, a tap may
  * move a little more than the touch slop, for touchscreens that jitter, and a touch that moves
  * further is a swipe only if quick and mostly horizontal, so a resting palm doesn't turn pages.
- * A second finger cancels the touch. Stylus strokes never get here, because the notes layer
- * consumes them.
+ * A second finger cancels the touch, and a touch going down in the stripes along the top and
+ * bottom, where the buttons are, does nothing. Stylus strokes never get here, because the notes
+ * layer consumes them.
  */
 fun Modifier.pageTaps(
     onTap: (position: Offset, size: IntSize) -> Unit,
@@ -26,8 +28,11 @@ fun Modifier.pageTaps(
     onLongPress: (() -> Unit)? = null,
 ): Modifier = pointerInput(Unit) {
     val slop = viewConfiguration.touchSlop * PageGestures.TAP_SLOP_FACTOR
+    val top = PageGestures.TOP_STRIPE_DP.dp.toPx()
+    val bottom = PageGestures.BOTTOM_STRIPE_DP.dp.toPx()
     awaitEachGesture {
         val down = awaitFirstDown()
+        if (PageGestures.inButtonStripe(down.position.y, size.height, top, bottom)) return@awaitEachGesture
         val touch = Touch(down)
         val released = if (onLongPress == null) {
             track(touch)

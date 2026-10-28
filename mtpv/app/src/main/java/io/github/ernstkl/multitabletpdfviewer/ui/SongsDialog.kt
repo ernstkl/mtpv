@@ -1,5 +1,6 @@
 package io.github.ernstkl.multitabletpdfviewer.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -12,12 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,7 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,8 +43,20 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 /** A song's file name without ".pdf". */
 fun songTitle(name: String) = if (name.endsWith(".pdf", ignoreCase = true)) name.dropLast(4) else name
 
+/** Two lines to drag a row by; three would look like a menu button. */
+@Composable
+fun DragHandle(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Canvas(modifier.size(24.dp).semantics { contentDescription = "Drag to move" }) {
+        val w = 2.dp.toPx()
+        listOf(0.4f, 0.6f).forEach { y ->
+            drawLine(color, Offset(0.15f * size.width, y * size.height), Offset(0.85f * size.width, y * size.height), w, StrokeCap.Round)
+        }
+    }
+}
+
 /**
- * The set as a table of contents: tap a song to show it, drag ≡ to change the order, untick a
+ * The set as a table of contents: tap a song to show it, drag = to change the order, untick a
  * song to leave it out of the pages shown.
  */
 @Composable
@@ -108,10 +122,8 @@ fun SongsDialog(rt: ControllerRuntime, st: ControllerState, onDismiss: () -> Uni
                                             style = MaterialTheme.typography.bodySmall,
                                         )
                                     }
-                                    Icon(
-                                        Icons.Default.Menu,
-                                        contentDescription = "Drag to move",
-                                        modifier = Modifier
+                                    DragHandle(
+                                        Modifier
                                             .draggableHandle(
                                                 onDragStarted = { dragFrom = order.indexOf(i) },
                                                 onDragStopped = {
@@ -120,8 +132,7 @@ fun SongsDialog(rt: ControllerRuntime, st: ControllerState, onDismiss: () -> Uni
                                                     dragFrom = -1
                                                 },
                                             )
-                                            .padding(12.dp)
-                                            .size(24.dp),
+                                            .padding(12.dp),
                                     )
                                 }
                             }
@@ -130,7 +141,7 @@ fun SongsDialog(rt: ControllerRuntime, st: ControllerState, onDismiss: () -> Uni
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Tap a song to show it from the leftmost screen, drag ≡ to move it. " +
+                    "Tap a song to show it from the leftmost screen, drag = to move it. " +
                         "Untick a song to leave it out of the pages; it stays in this list." +
                         if (s.folder != null) " Reload folder picks up PDFs added to or removed from the folder." else "",
                     style = MaterialTheme.typography.bodySmall,
@@ -138,7 +149,7 @@ fun SongsDialog(rt: ControllerRuntime, st: ControllerState, onDismiss: () -> Uni
             }
         },
         dismissButton = {
-            if (s.folder != null) TextButton(onClick = { rt.reloadFolder(); onDismiss() }) { Text("Reload folder") }
+            if (s.folder != null) TextButton(onClick = rt::reloadFolder) { Text("Reload folder") }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )

@@ -40,12 +40,20 @@ class SongSetTest {
     @Test
     fun positionCountsSongsShownAndPagesWithinTheSong() {
         assertEquals(PagePosition(2, 3, 2, 3), set.positionAt(4))
-        assertEquals("song 2 of 3: page 2 of 3", set.positionAt(4)!!.label)
+        assertEquals("2 of 3", set.positionAt(4)!!.songLabel)
+        assertEquals("Page 2 of 3", set.positionAt(4)!!.pageLabel)
         assertNull(set.positionAt(7))
         // Without B, C is the second of two songs shown.
-        assertEquals("song 2 of 2: page 1 of 1", set.exclude(1, true).positionAt(3)!!.label)
+        assertEquals("2 of 2", set.exclude(1, true).positionAt(3)!!.songLabel)
         val single = SongSet.of("x.pdf", listOf(Song("x.pdf", "x", "nx", 4)))
-        assertEquals("page 3 of 4", single.positionAt(3)!!.label)
+        assertNull(single.positionAt(3)!!.songLabel)
+        assertEquals("Page 3 of 4", single.positionAt(3)!!.pageLabel)
+    }
+
+    @Test
+    fun onlyInnerSongsHaveBothNeighbours() {
+        assertEquals(listOf(false, true, true), listOf(1, 3, 6).map { set.positionAt(it)!!.hasPrevious })
+        assertEquals(listOf(true, true, false), listOf(1, 3, 6).map { set.positionAt(it)!!.hasNext })
     }
 
     @Test
@@ -121,6 +129,18 @@ class SongSetTest {
     @Test
     fun equalByContent() {
         assertEquals(set, SongSet.of("Gig", set.songs.toList()))
+    }
+
+    @Test
+    fun nextAndPreviousSong() {
+        // From any page of a song to the first page of the song after or before it.
+        assertEquals(listOf(3, 3, 6, 6, 6, null), (1..6).map { set.nextSongPage(it) })
+        assertEquals(listOf(null, null, 1, 1, 1, 3), (1..6).map { set.previousSongPage(it) })
+        assertNull(set.nextSongPage(7))
+        // Excluded songs are skipped: A 1-2, C 3.
+        val s = set.exclude(1, true)
+        assertEquals(3, s.nextSongPage(2))
+        assertEquals(1, s.previousSongPage(3))
     }
 }
 

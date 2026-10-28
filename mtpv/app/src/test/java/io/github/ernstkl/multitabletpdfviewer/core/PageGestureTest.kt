@@ -28,4 +28,12 @@ class PageGestureTest {
         // Out and back again: moved, but not a swipe.
         assertEquals(PageGesture.NONE, classify(10f, maxMove = 300f))
     }
+
+    @Test
+    fun touchesInTheButtonStripesAreIgnored() {
+        assertEquals(true, PageGestures.inButtonStripe(10f, 1000, top = 100f, bottom = 150f))
+        assertEquals(false, PageGestures.inButtonStripe(100f, 1000, top = 100f, bottom = 150f))
+        assertEquals(false, PageGestures.inButtonStripe(850f, 1000, top = 100f, bottom = 150f))
+        assertEquals(true, PageGestures.inButtonStripe(851f, 1000, top = 100f, bottom = 150f))
+    }
 }

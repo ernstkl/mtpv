@@ -14,10 +14,19 @@ data class SongPage(val fileId: String, val notesKey: String, val page: Int) {
     val key get() = PageKey(notesKey, page)
 }
 
-/** Where a page sits in its set: song [song] of the [songs] shown, page [page] of the song's [pages]. */
-data class PagePosition(val song: Int, val songs: Int, val page: Int, val pages: Int) {
-    /** "song 2 of 7: page 1 of 3"; just "page 1 of 3" in a set of one song (a single PDF). */
-    val label get() = (if (songs > 1) "song $song of $songs: " else "") + "page $page of $pages"
+/**
+ * Where a page sits in its set: song [song] of the [songs] shown, page [page] of the song's [pages].
+ * [skip]: the screen offers « and » to the previous and next song, which only the leftmost one does.
+ */
+data class PagePosition(val song: Int, val songs: Int, val page: Int, val pages: Int, val skip: Boolean = false) {
+    /** "3 of 10" for the song; null in a set of one song (a single PDF), which has no songs to tell apart. */
+    val songLabel get() = if (songs > 1) "$song of $songs" else null
+
+    /** "Page 1 of 3", the page counted within its song. */
+    val pageLabel get() = "Page $page of $pages"
+
+    val hasPrevious get() = song > 1
+    val hasNext get() = song < songs
 }
 
 /**
@@ -55,6 +64,20 @@ class SongSet private constructor(val name: String, val songs: List<Song>) {
         if (songs[index].excluded) 0 else (0..index).count { !songs[it].excluded }
 
     val shownSongs: Int get() = songs.count { !it.excluded }
+
+    /** First page of the song shown after the one at global [page], or null if that is the last. */
+    fun nextSongPage(page: Int): Int? {
+        val i = songIndexAt(page)
+        if (i < 0) return null
+        return (i + 1 until songs.size).firstOrNull { !songs[it].excluded }?.let(::firstPageOf)
+    }
+
+    /** First page of the song shown before the one at global [page], or null if that is the first. */
+    fun previousSongPage(page: Int): Int? {
+        val i = songIndexAt(page)
+        if (i < 0) return null
+        return (i - 1 downTo 0).firstOrNull { !songs[it].excluded }?.let(::firstPageOf)
+    }
 
     /** Song page shown at global [page], or null for a blank screen. */
     fun locate(page: Int): SongPage? {

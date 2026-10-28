@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -57,6 +60,8 @@ import io.github.ernstkl.multitabletpdfviewer.net.DirectState
 import io.github.ernstkl.multitabletpdfviewer.net.DirectWifi
 import io.github.ernstkl.multitabletpdfviewer.net.Protocol
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 private val Online = Color(0xFF2E7D32)
 private val Busy = Color(0xFFF9A825)
@@ -171,7 +176,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                 }, onSwipe = { next -> if (next) rt.next() else rt.prev() }),
         ) {
             val own = st.ownTarget
-            PageView(own?.fileId, own?.page ?: 0, rt::render, own?.position?.label, dark = st.tools.dark) { fileId, page ->
+            PageView(own?.fileId, own?.page ?: 0, rt::render, own?.position, rt::skipSong, dark = st.tools.dark) { fileId, page ->
                 // The notes of the song shown, once its page is drawn (two songs may share a PDF).
                 val notesKey = own?.notesKey?.takeIf { own.fileId == fileId && own.page == page }
                 if (notesKey != null) {
@@ -338,105 +343,132 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
         onDispose(rt::screensClosed)
     }
     var host by remember { mutableStateOf("") }
+    val direct by rt.direct.state.collectAsStateWithLifecycle()
+    val code by rt.directCode.collectAsStateWithLifecycle()
+    // The order while a drag is going on; it is applied to the arrangement when the screen is dropped.
+    var order by remember(s.arrangement) { mutableStateOf(s.arrangement) }
+    var dragFrom by remember { mutableStateOf(-1) }
+    val listState = rememberLazyListState()
+    val reorder = rememberReorderableLazyListState(listState) { from, to ->
+        // Only screens move, and only among each other.
+        val a = order.indexOf(from.key)
+        val b = order.indexOf(to.key)
+        if (a >= 0 && b >= 0) order = order.toMutableList().apply { add(b, removeAt(a)) }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Screens, left to right") },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                s.arrangement.forEachIndexed { slot, id ->
-                    val page = st.pageForSlot(slot)
-                    // Name and status get the full width; the buttons go on their own line below.
-                    if (slot > 0) HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (id != Paging.SELF) {
-                            Box(Modifier.size(10.dp).background(colorFor(st.links[id]), CircleShape))
-                            Spacer(Modifier.width(8.dp))
+            // One list for all sections: a lazy list cannot sit inside a scrolling column.
+            LazyColumn(state = listState) {
+                items(order, key = { it }) { id ->
+                    ReorderableItem(reorder, key = id) { dragging ->
+                        Column(Modifier.background(if (dragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)) {
+                            if (order.first() != id) HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (id != Paging.SELF) {
+                                    Box(Modifier.size(10.dp).background(colorFor(st.links[id]), CircleShape))
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Text(if (id == Paging.SELF) "This device" else nameOf(st, id))
+                                    Text(
+                                        if (id == Paging.SELF) "controller" else describe(st.links[id]),
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                                DragHandle(
+                                    Modifier
+                                        .draggableHandle(
+                                            onDragStarted = { dragFrom = order.indexOf(id) },
+                                            onDragStopped = {
+                                                val to = order.indexOf(id)
+                                                if (dragFrom >= 0 && to != dragFrom) rt.move(dragFrom, to - dragFrom)
+                                                dragFrom = -1
+                                            },
+                                        )
+                                        .padding(12.dp),
+                                )
+                            }
+                            if (id != Paging.SELF) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    if (st.links[id]?.notPaired == true) TextButton(onClick = { rt.pair(id) }) { Text("Pair") }
+                                    TextButton(onClick = { rt.exclude(id) }) { Text("Remove") }
+                                }
+                            }
                         }
-                        Column {
-                            Text(if (id == Paging.SELF) "This device" else nameOf(st, id))
+                    }
+                }
+
+                item(key = "section:rest") {
+                    Column {
+                        val nearby = st.nearby.values.filter { it.uuid !in s.known }
+                        if (nearby.isNotEmpty()) {
+                            SectionDivider()
+                            Text("Nearby, not paired", style = MaterialTheme.typography.labelLarge)
+                            nearby.forEachIndexed { i, k ->
+                                if (i > 0) HorizontalDivider()
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("${k.name} (${k.uuid.take(4)})", Modifier.weight(1f))
+                                    TextButton(onClick = { rt.pair(k.uuid) }) { Text("Pair") }
+                                }
+                            }
+                        }
+
+                        val others = s.known.keys.filter { it !in s.arrangement }
+                        if (others.isNotEmpty()) {
+                            SectionDivider()
+                            Text("Known, not used", style = MaterialTheme.typography.labelLarge)
+                            others.forEachIndexed { i, id ->
+                                if (i > 0) HorizontalDivider()
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(nameOf(st, id), Modifier.weight(1f))
+                                    TextButton(onClick = { rt.include(id) }) { Text("Add") }
+                                    TextButton(onClick = { rt.forget(id) }) { Text("Forget") }
+                                }
+                            }
+                        }
+
+                        if (direct != DirectState.Off && nearby.isEmpty()) {
+                            SectionDivider()
+                            Text("Direct network on, code ${DirectCode.format(code)}", style = MaterialTheme.typography.labelLarge)
                             Text(
-                                (if (s.set == null) "" else if (page == 0) "blank · " else "page $page · ") +
-                                    if (id == Paging.SELF) "controller" else describe(st.links[id]),
+                                "Paired secondaries join it by themselves. Another one: ☰ → Join direct network… on it, " +
+                                    "type the code, and it shows up under Nearby.",
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { rt.move(slot, -1) }, enabled = slot > 0) { Text("◀\uFE0E") } // U+FE0E: text, not emoji
-                        TextButton(onClick = { rt.move(slot, +1) }, enabled = slot < s.arrangement.lastIndex) { Text("▶\uFE0E") }
-                        if (id != Paging.SELF) {
-                            if (st.links[id]?.notPaired == true) TextButton(onClick = { rt.pair(id) }) { Text("Pair") }
-                            TextButton(onClick = { rt.exclude(id) }) { Text("Remove") }
-                        }
-                    }
-                }
 
-                val nearby = st.nearby.values.filter { it.uuid !in s.known }
-                if (nearby.isNotEmpty()) {
-                    SectionDivider()
-                    Text("Nearby, not paired", style = MaterialTheme.typography.labelLarge)
-                    nearby.forEachIndexed { i, k ->
-                        if (i > 0) HorizontalDivider()
+                        SectionDivider()
+                        Text(
+                            "Drag = to change the order of the screens. " +
+                                "Secondaries with MTPV on screen appear under Nearby; this keeps searching while it is open. " +
+                                "Pair one, then tap Allow on it. If it does not appear, enter the address shown on it. " +
+                                "Without a shared Wi-Fi, the direct network starts by itself (Direct network in the menu).",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(if (st.scanning) "Searching the network…" else " ", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${k.name} (${k.uuid.take(4)})", Modifier.weight(1f))
-                            TextButton(onClick = { rt.pair(k.uuid) }) { Text("Pair") }
+                            OutlinedTextField(
+                                value = host,
+                                onValueChange = { host = it.trim() },
+                                label = { Text("IP[:port]") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(
+                                onClick = {
+                                    val h = host.substringBeforeLast(':').takeIf { ':' in host } ?: host
+                                    val p = host.substringAfterLast(':', "").toIntOrNull() ?: Protocol.DEFAULT_PORT
+                                    rt.addByAddress(h, p)
+                                    host = ""
+                                },
+                                enabled = host.isNotEmpty(),
+                            ) { Text("Add") }
                         }
                     }
-                }
-
-                val others = s.known.keys.filter { it !in s.arrangement }
-                if (others.isNotEmpty()) {
-                    SectionDivider()
-                    Text("Known, not used", style = MaterialTheme.typography.labelLarge)
-                    others.forEachIndexed { i, id ->
-                        if (i > 0) HorizontalDivider()
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(nameOf(st, id), Modifier.weight(1f))
-                            TextButton(onClick = { rt.include(id) }) { Text("Add") }
-                            TextButton(onClick = { rt.forget(id) }) { Text("Forget") }
-                        }
-                    }
-                }
-
-                val direct by rt.direct.state.collectAsStateWithLifecycle()
-                val code by rt.directCode.collectAsStateWithLifecycle()
-                if (direct != DirectState.Off && nearby.isEmpty()) {
-                    SectionDivider()
-                    Text("Direct network on, code ${DirectCode.format(code)}", style = MaterialTheme.typography.labelLarge)
-                    Text(
-                        "Paired secondaries join it by themselves. Another one: ☰ → Join direct network… on it, " +
-                            "type the code, and it shows up under Nearby.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-
-                SectionDivider()
-                Text(
-"Secondaries with MTPV on screen appear under Nearby; this keeps searching while it is open. " +
-                        "Pair one, then tap Allow on it. If it does not appear, enter the address shown on it. " +
-                        "Without a shared Wi-Fi, the direct network starts by itself (Direct network in the menu).",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(if (st.scanning) "Searching the network…" else " ", style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = host,
-                        onValueChange = { host = it.trim() },
-                        label = { Text("IP[:port]") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(
-                        onClick = {
-                            val h = host.substringBeforeLast(':').takeIf { ':' in host } ?: host
-                            val p = host.substringAfterLast(':', "").toIntOrNull() ?: Protocol.DEFAULT_PORT
-                            rt.addByAddress(h, p)
-                            host = ""
-                        },
-                        enabled = host.isNotEmpty(),
-                    ) { Text("Add") }
                 }
             }
         },

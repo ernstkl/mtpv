@@ -122,7 +122,7 @@ class SecondaryServer(port: Int, private val rt: SecondaryRuntime, identity: Tls
                     notesKey = body.optString("notesKey").ifEmpty { null },
                     page = body.optInt("page"),
                     position = body.optInt("song").takeIf { it > 0 }
-                        ?.let { PagePosition(it, body.optInt("songs"), body.optInt("page"), body.optInt("pages")) },
+                        ?.let { PagePosition(it, body.optInt("songs"), body.optInt("page"), body.optInt("pages"), body.optBoolean("songSkip")) },
                     notes = NotesJson.fromJson(body.optJSONArray("notes")),
                     notesRev = body.optLong("notesRev"),
                     savedRev = body.optLong("savedRev", -1),

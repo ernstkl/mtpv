@@ -18,6 +18,15 @@ object PageGestures {
     /** ... and at least this many times as wide as high. */
     const val SWIPE_MIN_RATIO = 2f
 
+    /** Finger touches that go down within this many dp of the top of the page are ignored: the round buttons and the song and page bar are there, ... */
+    const val TOP_STRIPE_DP = 48
+
+    /** ... and within this many of the bottom, where the note tool bar is. */
+    const val BOTTOM_STRIPE_DP = 56
+
+    /** A touch going down at [y] (px) on a page [height] px high is in the top or bottom stripe (px), where it does nothing. */
+    fun inButtonStripe(y: Float, height: Int, top: Float, bottom: Float): Boolean = y < top || y > height - bottom
+
     /**
      * A touch that moved [dx], [dy] (px) from down to lift in [durationMs], and at most [maxMove]
      * from where it went down on the way, on a screen [width] px wide. A tap stays within

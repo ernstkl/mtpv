@@ -54,7 +54,7 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
 3. Pair each secondary once: on the controller, tap the middle of the screen (or ☰ top left) to open
    the menu → **Screens** → under
    *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary once you have checked that both show the same 6-digit code.
-   Paired secondaries are added to the right of the controller; **Screens** sets the order (the
+   Paired secondaries are added to the right of the controller; **Screens** sets the order: drag = up or down (the
    controller can be in any position). While **Screens** is open, the controller keeps searching: by
    mDNS, and every 10 s by trying every address of the local network (for networks where mDNS is
    blocked, as on some phone hotspots, or misses tablets, as on Android 11). It also tries every
@@ -70,11 +70,12 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    other like one long PDF, in alphabetical order (numbers by value, so "2" comes before "10"). Opening
    the same folder again keeps its order; files added since go to the end, removed ones drop out.
    Subfolders are not included. **Songs** lists the set: tap a song
-   to show it from the leftmost screen, drag ≡ to change the order, untick a song to leave its pages
+   to show it from the leftmost screen, drag = to change the order, untick a song to leave its pages
    out (it stays in the list, so it can be ticked again). Order and ticks are kept for that folder.
-   **Reload folder** picks up added or removed PDFs. The top of the menu shows the song on the leftmost screen.
+   **Reload folder** picks up added or removed PDFs, and the list stays open. The top of the menu shows the song on the leftmost screen.
    **♫** next to ☰ opens **Songs** directly (or the library, without a set); only the controller has it,
-   so it also shows which screen is the controller.
+   so it also shows which screen is the controller. **«** and **»** in the bar at the top of the leftmost
+   screen show the previous or next song there (see *Page numbers* below).
    **Open set from library…** browses the library: a folder without subfolders
    opens as a set at a tap, one with subfolders opens to show them (↑ goes back up), and *Show this
    folder as a set* opens the PDFs of the folder shown. Folders starting with
@@ -90,6 +91,7 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
 4. Turn pages: tap the left/right third of any screen, controller or secondary, swipe (to the left for the
    next page, like paper), or use a Bluetooth pedal on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
+   Taps and swipes that start in the stripes along the top and bottom edge, where the buttons are, do nothing.
 5. MTPV works on a tablet only while it is on that tablet's screen (which MTPV keeps switched on).
    Switch to another app and that tablet pauses: nothing runs in the background, so nothing uses the
    battery after the gig, and there is no notification. Back in MTPV, it reconnects and catches up
@@ -133,8 +135,10 @@ file from the folder, or changing its content, deletes its notes; renaming it ke
 **Copy notes from…** in the menu gives the song on the leftmost screen the notes of another song
 with exactly the same PDF, in any set (newest first, with set and date); they replace its own.
 
-Page numbers: the bottom right corner of every screen shows where its page is, as "song 2 of 7: page 1 of 3":
-the song among the songs shown in the set and the page within that song. A single PDF shows just "page 1 of 3".
+Page numbers: the bar at the top center of every screen shows where its page is, as "Song 2 of 7 | Page 1 of 3":
+the song among the songs shown in the set and the page within that song. A single PDF shows just "Page 1 of 3".
+On the leftmost screen, controller or secondary, the song number sits between **«** and **»**: they show the
+previous or next song from the leftmost screen (dimmed at the first and last song).
 
 Dark pages: **◐** at the top right of any screen swaps light and dark on all screens: white paper turns very dark gray, black notes off-white
 (softer than pure black and white, which makes thin lines blur for many eyes).

@@ -38,7 +38,7 @@ private val Sections = listOf(
             "3. On one tablet, choose Controller and open a PDF. Then Screens → Pair; " +
                 "check that the secondary shows the same 6-digit code and tap Allow there. " +
                 "Matching codes mean no other device is in between; everything between the tablets is encrypted.",
-            "Screens also sets the order of the screens, left to right. " +
+            "Screens also sets the order of the screens, left to right: drag = up or down. " +
                 "Screens keeps searching while it is open; if a secondary isn't found, enter its address there. " +
                 "MTPV must be on its screen.",
             "A paired secondary is no longer offered to other controllers. To pair it with another one, " +
@@ -57,10 +57,12 @@ private val Sections = listOf(
         "Tap the left or right third of any screen, swipe, or use a Bluetooth pedal.",
         listOf(
             "Every screen moves on by one page, until the last page is on the leftmost screen.",
+            "Taps and swipes along the top and bottom edge, where the buttons are, do nothing.",
             "Controller: tap the middle or ☰ for the menu; ♫ next to it lists the songs (only the controller has it). " +
                 "Secondary: tap the middle or ☰ for its address and settings.",
-            "The bottom right corner shows where the page is: \"song 2 of 7: page 1 of 3\", " +
-                "the page counted within its song (just \"page 1 of 3\" for a single PDF).",
+            "The bar at the top shows where the page is: \"Song 2 of 7 | Page 1 of 3\", " +
+                "the page counted within its song (just \"Page 1 of 3\" for a single PDF).",
+            "On the leftmost screen, « and » around the song number show the previous or next song from there.",
             "◐ at the top right turns dark pages on or off on all screens: white paper turns dark gray, notes light, colours stay.",
             "MTPV works on a tablet only while it is on screen there. Switched to another app, that tablet " +
                 "pauses and uses no battery; back in MTPV, it catches up within seconds.",
@@ -73,7 +75,7 @@ private val Sections = listOf(
             "Put one PDF per song in a folder, the set folders below one library folder (menu → Library → Library folder), " +
                 "then pick a set under Open set from library…. A folder with subfolders opens to show them; ↑ goes back up.",
             "The songs follow each other in alphabetical order. " +
-                "Under Songs, tap a song to jump to it, drag ≡ to change the order, untick a song to leave it out.",
+                "Under Songs, tap a song to jump to it, drag = to change the order, untick a song to leave it out.",
             "The set folder is only read, never changed. Order, ticks and notes stay in MTPV.",
             "Moved the library? Pick it again under Library → Library folder: sets keep their order, ticks and notes.",
         ),

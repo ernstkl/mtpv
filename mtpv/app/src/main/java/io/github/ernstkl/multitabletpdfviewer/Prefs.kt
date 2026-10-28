@@ -181,7 +181,10 @@ class Prefs(private val context: Context) {
         version = sp.getLong("displayVersion", 0),
         controller = sp.getString("displayController", null),
         position = sp.getInt("displaySong", 0).takeIf { it > 0 }?.let {
-            PagePosition(it, sp.getInt("displaySongs", 0), sp.getInt("displayPage", 0), sp.getInt("displayPages", 0))
+            PagePosition(
+                it, sp.getInt("displaySongs", 0), sp.getInt("displayPage", 0), sp.getInt("displayPages", 0),
+                sp.getBoolean("displaySongSkip", false),
+            )
         },
     )
 
@@ -194,6 +197,7 @@ class Prefs(private val context: Context) {
             .putInt("displaySong", d.position?.song ?: 0)
             .putInt("displaySongs", d.position?.songs ?: 0)
             .putInt("displayPages", d.position?.pages ?: 0)
+            .putBoolean("displaySongSkip", d.position?.skip == true)
             .apply()
     }
 }

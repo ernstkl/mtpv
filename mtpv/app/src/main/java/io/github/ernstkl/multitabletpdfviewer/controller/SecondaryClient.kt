@@ -134,6 +134,7 @@ class SecondaryClient(private val ep: Endpoint, private val tls: Tls.Client = Tl
             .put("song", position?.song ?: 0)
             .put("songs", position?.songs ?: 0)
             .put("pages", position?.pages ?: 0)
+            .put("songSkip", position?.skip == true)
             .put("notes", NotesJson.toJson(notes))
             .put("notesRev", notesRev)
             .put("savedRev", savedRev)
