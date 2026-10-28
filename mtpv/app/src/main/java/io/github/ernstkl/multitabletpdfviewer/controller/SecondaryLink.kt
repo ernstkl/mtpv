@@ -1,0 +1,311 @@
+package io.github.ernstkl.multitabletpdfviewer.controller
+
+import android.util.Log
+import io.github.ernstkl.multitabletpdfviewer.BuildConfig
+import io.github.ernstkl.multitabletpdfviewer.core.NotesStore
+import io.github.ernstkl.multitabletpdfviewer.core.PagePosition
+import io.github.ernstkl.multitabletpdfviewer.core.PageKey
+import io.github.ernstkl.multitabletpdfviewer.core.PdfCache
+import io.github.ernstkl.multitabletpdfviewer.core.ToolState
+import io.github.ernstkl.multitabletpdfviewer.net.Endpoint
+import io.github.ernstkl.multitabletpdfviewer.net.Tls
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicLong
+
+/**
+ * What one secondary should show: a PDF's page and the key of its song's notes, and where that page
+ * sits in the set. page 0 is blank, without a position.
+ */
+data class Target(val fileId: String?, val notesKey: String?, val page: Int, val position: PagePosition? = null)
+
+data class LinkStatus(
+    val online: Boolean = false,
+    /** The secondary refuses this controller: pair it (again). */
+    val notPaired: Boolean = false,
+    /** The secondary shows another key than the one pinned at pairing (reinstalled?); with [notPaired]. */
+    val keyChanged: Boolean = false,
+    val shownPage: Int? = null,
+    val upload: Float? = null,
+    val error: String? = null,
+)
+
+/** How links hand notes to the controller. Implemented by [ControllerRuntime]. */
+interface NotesHub {
+    /** Saves notes edited on secondary [uuid]. */
+    fun saveFromSecondary(uuid: String, notes: SecondaryClient.Notes)
+
+    /** Waits (briefly) until no other reachable secondary still holds unsaved notes of [key]. */
+    suspend fun awaitFree(key: PageKey, uuid: String)
+
+    fun load(key: PageKey): NotesStore.Page
+
+    /** Secondary [uuid] now shows [key] (null: nothing); its notes there may change until fetched. */
+    fun hold(uuid: String, key: PageKey?)
+}
+
+/**
+ * Keeps one secondary in line with its [Target]: verifies its identity, uploads the PDF if it is
+ * missing, sends the page, and keeps checking it every few seconds. Only the latest target matters,
+ * so missed page turns are never replayed. Before a secondary gets a new page, the notes on its
+ * current page are fetched and saved, so they are never lost. Once the page is right, note tool and
+ * finger switch follow, and the direct network's code. A second loop forwards page turns and tool
+ * picks entered on the secondary to [onInput].
+ */
+class SecondaryLink(
+    private val uuid: String,
+    private val controllerId: String,
+    private val cache: PdfCache,
+    private val versions: VersionClock,
+    private val notes: NotesHub,
+    private val report: (LinkStatus) -> Unit,
+    private val onInput: (String) -> Unit,
+) {
+    @Volatile private var target: Target? = null
+    @Volatile private var tools: ToolState? = null
+    @Volatile private var directCode: String? = null
+    @Volatile private var endpoint: Endpoint? = null
+    /** The secondary's certificate, pinned at pairing; null if not paired. */
+    @Volatile private var fingerprint: String? = null
+
+    /** The endpoint whose identity has been checked; null while offline. */
+    @Volatile private var verified: Endpoint? = null
+    private val wake = Channel<Unit>(Channel.CONFLATED)
+    /** Flushes asked for and done so far, see [flush]. */
+    private val flushWanted = AtomicLong(0)
+    private val flushDone = MutableStateFlow(0L)
+
+    fun setTarget(t: Target?) {
+        if (t == target) return
+        target = t
+        wake.trySend(Unit)
+    }
+
+    fun setTools(t: ToolState) {
+        if (t == tools) return
+        tools = t
+        wake.trySend(Unit)
+    }
+
+    /** The direct network's code for the secondary ("" for none); sent once per connection and when it changes. */
+    fun setDirectCode(code: String) {
+        if (code == directCode) return
+        directCode = code
+        wake.trySend(Unit)
+    }
+
+    /**
+     * Fetches and saves the notes on the secondary's page now, by sending that page again: the
+     * secondary has no unsaved notes afterwards. Returns once done; waits while it is offline.
+     */
+    suspend fun flush() {
+        val n = flushWanted.incrementAndGet()
+        wake.trySend(Unit)
+        flushDone.first { it >= n }
+    }
+
+    fun setFingerprint(f: String?) {
+        if (f == fingerprint) return
+        fingerprint = f
+        verified = null
+        wake.trySend(Unit)
+    }
+
+    /**
+     * Paired again: tries at once. A link refused as not paired waits for this, since pairing again
+     * with the same secondary keeps its fingerprint, so [setFingerprint] does not wake it.
+     */
+    fun repaired() {
+        verified = null
+        wake.trySend(Unit)
+    }
+
+    fun setEndpoint(ep: Endpoint?) {
+        if (ep == endpoint) return
+        endpoint = ep
+        wake.trySend(Unit)
+    }
+
+    fun launchIn(scope: CoroutineScope) = scope.launch {
+        launch { run() }
+        launch { pollInput() }
+    }
+
+    private suspend fun run() {
+        var status = LinkStatus()
+        fun publish(s: LinkStatus) {
+            if (s != status) {
+                status = s
+                report(s)
+            }
+        }
+
+        var applied: Target? = null
+        var appliedTools: ToolState? = null
+        var appliedDirect: String? = null
+        var files = emptySet<String>()
+        var backoff = 1_000L
+
+        while (kotlin.coroutines.coroutineContext.isActive) {
+            val ep = endpoint
+            val pin = fingerprint
+            if (ep == null || pin == null) {
+                publish(if (pin == null) LinkStatus(notPaired = true, error = "not paired") else LinkStatus(error = "not found yet"))
+                wake.receive()
+                continue
+            }
+            try {
+                val client = SecondaryClient(ep, Tls.pinned(pin))
+                if (verified != ep) {
+                    val info = client.info()
+                    if (info.uuid != uuid) throw IOException("a different device answers at $ep")
+                    files = client.files()
+                    applied = null
+                    appliedTools = null
+                    appliedDirect = null
+                    verified = ep
+                    publish(LinkStatus(online = true))
+                }
+                val want = target
+                val flushTo = flushWanted.get()
+                if (flushTo > flushDone.value) {
+                    if (want == null) flushDone.value = flushTo else applied = null
+                }
+                if (want != null && want != applied) {
+                    val fileId = want.fileId
+                    if (fileId != null && fileId !in files) {
+                        if (!cache.has(fileId)) throw IOException("PDF missing on this device")
+                        publish(status.copy(upload = 0f))
+                        client.upload(fileId, cache.file(fileId)) { publish(status.copy(upload = it)) }
+                        files = files + fileId
+                    }
+                    // Save what was written on the current page before it is replaced.
+                    val t0 = System.nanoTime()
+                    val back = client.notes()
+                    val tNotes = System.nanoTime()
+                    if (back.dirty && back.notesKey != null && back.page > 0) notes.saveFromSecondary(uuid, back)
+                    notes.hold(uuid, null)
+                    val key = want.notesKey?.takeIf { fileId != null && want.page > 0 }?.let { PageKey(it, want.page) }
+                    key?.let { notes.awaitFree(it, uuid) }
+                    val page = key?.let { notes.load(it) }
+                    val t1 = System.nanoTime()
+                    val r = client.display(
+                        controllerId, versions.next(), fileId, key?.notesKey, want.page, want.position,
+                        page?.strokes.orEmpty(), page?.rev ?: 0, back.rev,
+                    )
+                    if (BuildConfig.DEBUG) {
+                        val t2 = System.nanoTime()
+                        // Round trips of the page turn's two calls; waiting for notes held elsewhere is left out.
+                        Log.d(TAG, "${uuid.take(4)} page ${want.page}: notes ${(tNotes - t0) / 1_000_000} ms, " +
+                            "display ${(t2 - t1) / 1_000_000} ms, $r")
+                    }
+                    when (r) {
+                        SecondaryClient.DisplayResult.Ok -> {
+                            applied = want
+                            notes.hold(uuid, key)
+                            flushDone.value = maxOf(flushDone.value, flushTo)
+                        }
+                        is SecondaryClient.DisplayResult.Stale -> versions.bumpTo(r.currentVersion)
+                        SecondaryClient.DisplayResult.UnknownFile -> files = files - fileId.orEmpty()
+                        // Being written on, or written to meanwhile: fetch again shortly.
+                        SecondaryClient.DisplayResult.NotesUnsaved -> delay(100)
+                    }
+                    publish(LinkStatus(online = true, shownPage = applied?.page))
+                    continue
+                }
+                val t = tools
+                if (t != null && t != appliedTools) {
+                    client.tools(t)
+                    appliedTools = t
+                    continue
+                }
+                val d = directCode
+                if (d != null && d != appliedDirect) {
+                    client.direct(d)
+                    appliedDirect = d
+                    continue
+                }
+                backoff = 1_000L
+                val woken = withTimeoutOrNull(PING_MS) { wake.receive() }
+                if (woken == null) {
+                    // Ping, and resend if the secondary shows something else (restarted, other controller).
+                    val st = client.state()
+                    if (applied != null && (st.fileId != applied.fileId || st.page != applied.page)) applied = null
+                    if (st.tools != appliedTools) appliedTools = null
+                }
+            } catch (e: KeyChangedException) {
+                // Only a new pairing (setFingerprint) helps; wait for it.
+                verified = null
+                publish(LinkStatus(notPaired = true, keyChanged = true, error = "new key"))
+                wake.receive()
+            } catch (e: NotPairedException) {
+                // Only a new pairing (setFingerprint, repaired) helps; wait for it.
+                verified = null
+                publish(LinkStatus(online = true, notPaired = true, error = "not paired"))
+                wake.receive()
+            } catch (e: IOException) {
+                verified = null
+                publish(LinkStatus(error = e.message ?: e.javaClass.simpleName))
+                withTimeoutOrNull(backoff) { wake.receive() }
+                backoff = (backoff * 2).coerceAtMost(5_000L)
+            }
+        }
+    }
+
+    private suspend fun pollInput() {
+        var after = -1L
+        var polled: Endpoint? = null
+        while (kotlin.coroutines.coroutineContext.isActive) {
+            val ep = verified
+            val pin = fingerprint
+            if (ep == null || pin == null) {
+                delay(500)
+                continue
+            }
+            if (ep != polled) {
+                after = -1
+                polled = ep
+            }
+            try {
+                if (BuildConfig.DEBUG && after < 0) Log.d(TAG, "${uuid.take(4)} input poll starts at $ep")
+                val (seq, events) = SecondaryClient(ep, Tls.pinned(pin)).input(after)
+                after = seq
+                events.forEach(onInput)
+            } catch (e: IOException) {
+                delay(1_000)
+            }
+        }
+    }
+
+    companion object {
+        private const val PING_MS = 3_000L
+        private const val TAG = "MtpvLink"
+    }
+}
+
+/** Display command versions: strictly increasing, also across app restarts. */
+class VersionClock(private val load: () -> Long, private val save: (Long) -> Unit) {
+    private var last = load()
+
+    @Synchronized
+    fun next(): Long {
+        last = maxOf(last + 1, System.currentTimeMillis())
+        save(last)
+        return last
+    }
+
+    @Synchronized
+    fun bumpTo(v: Long) {
+        if (v > last) {
+            last = v
+            save(v)
+        }
+    }
+}

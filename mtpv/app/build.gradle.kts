@@ -16,11 +16,11 @@ val gitCommit = runCatching {
 }.getOrNull()?.takeIf { it.isNotEmpty() }
 
 android {
-    namespace = "io.github.ernstkl.mtpv"
+    namespace = "io.github.ernstkl.multitabletpdfviewer"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.github.ernstkl.mtpv"
+        applicationId = "io.github.ernstkl.multitabletpdfviewer"
         minSdk = 29
         targetSdk = 35
         versionCode = 3
