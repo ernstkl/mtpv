@@ -25,8 +25,8 @@ class AlreadyPairedException : IOException("paired with another controller")
 /** The secondary shows another certificate than the one pinned at pairing: reinstalled, or someone else. */
 class KeyChangedException(cause: Throwable) : IOException("new key", cause)
 
-/** The secondary speaks another version of [Protocol]; [app] is its app version name ("" if it sends none). */
-class VersionMismatchException(val app: String) : IOException("app version $app")
+/** The secondary speaks API version [api] of [Protocol], not ours. */
+class VersionMismatchException(api: Int) : IOException("API version $api")
 
 /**
  * Blocking calls to one secondary's HTTPS API, trusting its certificate as [tls] says: pinned for a

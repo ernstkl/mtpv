@@ -41,7 +41,7 @@ private val Sections = listOf(
             "Screens also sets the order of the screens, left to right: drag = up or down. " +
                 "Screens keeps searching while it is open; if a secondary isn't found, enter its address there. " +
                 "MTPV must be on its screen.",
-            "All tablets need the same MTPV version. Screens shows a secondary with another one in red, with both versions.",
+            "All tablets need MTPV with the same API version. If one differs, the controller says so with a list of all screens; update MTPV on all devices.",
             "A paired secondary is no longer offered to other controllers. To pair it with another one, " +
                 "remove its controller on it first (☰ → Paired controllers → Remove).",
             "No shared Wi-Fi? The controller then starts its own direct network, and paired secondaries " +

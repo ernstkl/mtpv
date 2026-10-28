@@ -35,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -219,6 +220,12 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
         }
     }
 
+    // Pops up whenever the set of screens with another API version changes, so a blank secondary is never a riddle.
+    val mismatched = s.arrangement.filter { st.links[it]?.apiMismatch == true }.toSet()
+    var mismatchSeen by remember { mutableStateOf(emptySet<String>()) }
+    if (mismatched.isNotEmpty() && mismatched != mismatchSeen) ApiMismatchDialog(st) { mismatchSeen = mismatched }
+    LaunchedEffect(mismatched) { if (mismatched.isEmpty()) mismatchSeen = emptySet() }
+
     if (showScreens) ScreensDialog(rt, st) { showScreens = false }
     if (showDirect) DirectNetworkDialog(rt) { showDirect = false }
     if (showSets) SetsDialog(rt, st, onChooseLibrary = { libraryPicker.launch(null) }) { showSets = false }
@@ -331,7 +338,7 @@ private fun StatusDots(st: ControllerState, modifier: Modifier) {
 }
 
 private fun colorFor(l: LinkStatus?): Color = when {
-    l == null || !l.online || l.notPaired || l.otherApp != null -> Offline
+    l == null || !l.online || l.notPaired || l.apiMismatch -> Offline
     l.upload != null -> Busy
     else -> Online
 }
@@ -477,6 +484,40 @@ private fun ScreensDialog(rt: ControllerRuntime, st: ControllerState, onDismiss:
     )
 }
 
+/** Lists every screen with its app and API version; the ones that differ get no pages until updated. */
+@Composable
+private fun ApiMismatchDialog(st: ControllerState, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("API mismatch") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("Update MTPV on all devices. The screens in red speak another API version and show nothing until then.")
+                Spacer(Modifier.height(12.dp))
+                st.session.arrangement.forEachIndexed { slot, id ->
+                    if (slot > 0) HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    val l = st.links[id]
+                    val bad = l?.apiMismatch == true
+                    Text(
+                        if (id == Paging.SELF) "This device (controller)" else nameOf(st, id),
+                        color = if (bad) Offline else Color.Unspecified,
+                    )
+                    Text(
+                        when {
+                            id == Paging.SELF -> "app ${BuildConfig.VERSION_NAME}, API ${Protocol.API_VERSION}"
+                            l?.api == null -> "not reached yet"
+                            else -> "app ${l.app?.ifEmpty { null } ?: "older"}, API ${l.api}"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (bad) Offline else Color.Unspecified,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+    )
+}
+
 /** Between the sections of the Screens dialog; stronger than the thin lines between devices. */
 @Composable
 private fun SectionDivider() =
@@ -488,7 +529,7 @@ private fun nameOf(st: ControllerState, uuid: String): String =
 private fun describe(l: LinkStatus?): String = when {
     l == null -> "connecting…"
     l.upload != null -> "sending PDF ${(l.upload * 100).toInt()}%"
-    l.otherApp != null -> "app version ${l.otherApp.ifEmpty { "older" }}, this one ${BuildConfig.VERSION_NAME}: update MTPV"
+    l.apiMismatch -> "API ${l.api}, this one ${Protocol.API_VERSION}: update MTPV"
     l.keyChanged -> "new key (reinstalled?), pair it again"
     l.notPaired -> "not paired"
     l.online -> "online"

@@ -88,9 +88,10 @@ import io.github.ernstkl.multitabletpdfviewer.core.PairCode
  *
  * Versions: apiVersion is [Protocol.API_VERSION], raised with every change to this API, and app the
  * app's version name. A controller works only with secondaries of its own apiVersion: after GET
- * /v1/info on a new connection it sends nothing more to a secondary with another one, and shows
- * both app versions so the older device can be updated. Equal versions on both sides is all it
- * takes, so the check runs on the controller alone.
+ * /v1/info on a new connection it sends nothing more to a secondary with another one, and pops up
+ * a list of all screens with their app and API versions, so the devices can be updated. App
+ * versions may differ. Equal API versions on both sides is all it takes, so the check runs on the
+ * controller alone.
  *
  * During development all devices run the same app version; there are no fallbacks for older ones.
  */

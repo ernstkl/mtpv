@@ -36,9 +36,13 @@ data class LinkStatus(
     val shownPage: Int? = null,
     val upload: Float? = null,
     val error: String? = null,
-    /** The secondary runs another protocol version; its app version name ("" if unknown). Nothing is sent to it. */
-    val otherApp: String? = null,
-)
+    /** App version name ("" if it sends none) and [Protocol.API_VERSION] of the secondary when last reached; null before. */
+    val app: String? = null,
+    val api: Int? = null,
+) {
+    /** The secondary speaks another API version: nothing is sent to it. */
+    val apiMismatch get() = api != null && api != Protocol.API_VERSION
+}
 
 /** How links hand notes to the controller. Implemented by [ControllerRuntime]. */
 interface NotesHub {
@@ -143,7 +147,9 @@ class SecondaryLink(
 
     private suspend fun run() {
         var status = LinkStatus()
-        fun publish(s: LinkStatus) {
+        var seen: SecondaryClient.Info? = null
+        fun publish(status0: LinkStatus) {
+            val s = status0.copy(app = seen?.app, api = seen?.apiVersion)
             if (s != status) {
                 status = s
                 report(s)
@@ -169,7 +175,8 @@ class SecondaryLink(
                 if (verified != ep) {
                     val info = client.info()
                     if (info.uuid != uuid) throw IOException("a different device answers at $ep")
-                    if (info.apiVersion != Protocol.API_VERSION) throw VersionMismatchException(info.app)
+                    seen = info
+                    if (info.apiVersion != Protocol.API_VERSION) throw VersionMismatchException(info.apiVersion)
                     files = client.files()
                     applied = null
                     appliedTools = null
@@ -257,7 +264,7 @@ class SecondaryLink(
             } catch (e: VersionMismatchException) {
                 // Updating the app restarts the secondary; look again now and then.
                 verified = null
-                publish(LinkStatus(online = true, otherApp = e.app, error = e.message))
+                publish(LinkStatus(online = true, error = e.message))
                 withTimeoutOrNull(VERSION_RETRY_MS) { wake.receive() }
             } catch (e: IOException) {
                 verified = null
