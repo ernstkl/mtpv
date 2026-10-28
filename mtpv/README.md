@@ -60,6 +60,8 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    blocked, as on some phone hotspots, or misses tablets, as on Android 11). It also tries every
    address by itself while a paired secondary cannot be reached. Adding a secondary by IP still works too.
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
+   All tablets need the same MTPV version: **Screens** shows a secondary with another one in red, with
+   both app versions ("app version 0.11.0, this one 0.12.0: update MTPV"), and gets no pages until updated.
    A paired secondary is off the market: other controllers do not list it, and it refuses their
    pairing until its controller is removed on it (tap its middle or ☰ → *Paired controllers* →
    **Remove**). So where several people use MTPV in one room, *Nearby* shows only the tablets not

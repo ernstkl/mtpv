@@ -8,6 +8,7 @@ import io.github.ernstkl.multitabletpdfviewer.core.PageKey
 import io.github.ernstkl.multitabletpdfviewer.core.PdfCache
 import io.github.ernstkl.multitabletpdfviewer.core.ToolState
 import io.github.ernstkl.multitabletpdfviewer.net.Endpoint
+import io.github.ernstkl.multitabletpdfviewer.net.Protocol
 import io.github.ernstkl.multitabletpdfviewer.net.Tls
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -35,6 +36,8 @@ data class LinkStatus(
     val shownPage: Int? = null,
     val upload: Float? = null,
     val error: String? = null,
+    /** The secondary runs another protocol version; its app version name ("" if unknown). Nothing is sent to it. */
+    val otherApp: String? = null,
 )
 
 /** How links hand notes to the controller. Implemented by [ControllerRuntime]. */
@@ -52,8 +55,8 @@ interface NotesHub {
 }
 
 /**
- * Keeps one secondary in line with its [Target]: verifies its identity, uploads the PDF if it is
- * missing, sends the page, and keeps checking it every few seconds. Only the latest target matters,
+ * Keeps one secondary in line with its [Target]: verifies its identity and protocol version,
+ * uploads the PDF if it is missing, sends the page, and keeps checking it every few seconds. Only the latest target matters,
  * so missed page turns are never replayed. Before a secondary gets a new page, the notes on its
  * current page are fetched and saved, so they are never lost. Once the page is right, note tool and
  * finger switch follow, and the direct network's code. A second loop forwards page turns and tool
@@ -166,6 +169,7 @@ class SecondaryLink(
                 if (verified != ep) {
                     val info = client.info()
                     if (info.uuid != uuid) throw IOException("a different device answers at $ep")
+                    if (info.apiVersion != Protocol.API_VERSION) throw VersionMismatchException(info.app)
                     files = client.files()
                     applied = null
                     appliedTools = null
@@ -250,6 +254,11 @@ class SecondaryLink(
                 verified = null
                 publish(LinkStatus(online = true, notPaired = true, error = "not paired"))
                 wake.receive()
+            } catch (e: VersionMismatchException) {
+                // Updating the app restarts the secondary; look again now and then.
+                verified = null
+                publish(LinkStatus(online = true, otherApp = e.app, error = e.message))
+                withTimeoutOrNull(VERSION_RETRY_MS) { wake.receive() }
             } catch (e: IOException) {
                 verified = null
                 publish(LinkStatus(error = e.message ?: e.javaClass.simpleName))
@@ -286,6 +295,7 @@ class SecondaryLink(
 
     companion object {
         private const val PING_MS = 3_000L
+        private const val VERSION_RETRY_MS = 10_000L
         private const val TAG = "MtpvLink"
     }
 }

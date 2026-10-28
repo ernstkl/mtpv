@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.ernstkl.multitabletpdfviewer.BuildConfig
 import io.github.ernstkl.multitabletpdfviewer.controller.ControllerRuntime
 import io.github.ernstkl.multitabletpdfviewer.controller.ControllerState
 import io.github.ernstkl.multitabletpdfviewer.controller.LinkStatus
@@ -330,7 +331,7 @@ private fun StatusDots(st: ControllerState, modifier: Modifier) {
 }
 
 private fun colorFor(l: LinkStatus?): Color = when {
-    l == null || !l.online || l.notPaired -> Offline
+    l == null || !l.online || l.notPaired || l.otherApp != null -> Offline
     l.upload != null -> Busy
     else -> Online
 }
@@ -487,6 +488,7 @@ private fun nameOf(st: ControllerState, uuid: String): String =
 private fun describe(l: LinkStatus?): String = when {
     l == null -> "connecting…"
     l.upload != null -> "sending PDF ${(l.upload * 100).toInt()}%"
+    l.otherApp != null -> "app version ${l.otherApp.ifEmpty { "older" }}, this one ${BuildConfig.VERSION_NAME}: update MTPV"
     l.keyChanged -> "new key (reinstalled?), pair it again"
     l.notPaired -> "not paired"
     l.online -> "online"

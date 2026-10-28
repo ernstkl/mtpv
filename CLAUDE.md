@@ -15,8 +15,9 @@ build, usage and protocol summary: `mtpv/README.md`.
 ## Rules
 
 - `net/Protocol.kt` is the contract between controller and secondary. Change the API there first
-  and keep its doc comment in sync. During development all devices run the same app version: no
-  fallbacks for older controllers or secondaries.
+  and keep its doc comment in sync. Raise `Protocol.API_VERSION` with every change to the API: the
+  controller works only with secondaries of its own version. During development all devices run
+  the same app version: no fallbacks for older controllers or secondaries.
 - Keep the invariants from `CONCEPT.md`: display commands are versioned and never go backwards,
   files are keyed by SHA-256 and notes by song (set ID and notes ID), the controller owns the
   authoritative notes and fetches a secondary's edits before giving it another page.

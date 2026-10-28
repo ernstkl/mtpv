@@ -11,7 +11,7 @@ import io.github.ernstkl.multitabletpdfviewer.core.PairCode
  * then only that one). The secondary takes any client certificate and decides by its fingerprint
  * what the client may do.
  *
- *   GET  /v1/info          {uuid, name, apiVersion, open}               (any client; also how the controller
+ *   GET  /v1/info          {uuid, name, apiVersion, app, open}          (any client; also how the controller
  *                                                                        finds secondaries by address scan
  *                                                                        on DEFAULT_PORT where mDNS fails)
  *   POST /v1/pair          {controller, name, commit} -> {requestId, nonce}
@@ -86,11 +86,17 @@ import io.github.ernstkl.multitabletpdfviewer.core.PairCode
  * reached it for a few seconds, or at once without a Wi-Fi network, so a secondary paired at home
  * finds the controller elsewhere without typing. A secondary never paired has the code typed in.
  *
+ * Versions: apiVersion is [Protocol.API_VERSION], raised with every change to this API, and app the
+ * app's version name. A controller works only with secondaries of its own apiVersion: after GET
+ * /v1/info on a new connection it sends nothing more to a secondary with another one, and shows
+ * both app versions so the older device can be updated. Equal versions on both sides is all it
+ * takes, so the check runs on the controller alone.
+ *
  * During development all devices run the same app version; there are no fallbacks for older ones.
  */
 object Protocol {
     const val SERVICE_TYPE = "_mtpv._tcp"
-    const val API_VERSION = 2
+    const val API_VERSION = 3
     const val DEFAULT_PORT = 8765
     const val INPUT_WAIT_MS = 20_000L
     const val MAX_JSON_BODY = 16L * 1024 * 1024

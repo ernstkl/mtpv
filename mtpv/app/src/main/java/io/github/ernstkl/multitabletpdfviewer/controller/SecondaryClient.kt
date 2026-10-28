@@ -25,6 +25,9 @@ class AlreadyPairedException : IOException("paired with another controller")
 /** The secondary shows another certificate than the one pinned at pairing: reinstalled, or someone else. */
 class KeyChangedException(cause: Throwable) : IOException("new key", cause)
 
+/** The secondary speaks another version of [Protocol]; [app] is its app version name ("" if it sends none). */
+class VersionMismatchException(val app: String) : IOException("app version $app")
+
 /**
  * Blocking calls to one secondary's HTTPS API, trusting its certificate as [tls] says: pinned for a
  * paired secondary, any for probes. Every failure is an IOException.
@@ -32,7 +35,7 @@ class KeyChangedException(cause: Throwable) : IOException("new key", cause)
 class SecondaryClient(private val ep: Endpoint, private val tls: Tls.Client = Tls.any()) {
 
     /** [open]: paired with no controller, so it may be paired here. */
-    data class Info(val uuid: String, val name: String, val open: Boolean)
+    data class Info(val uuid: String, val name: String, val open: Boolean, val apiVersion: Int, val app: String)
     /** [tools] is null if the secondary sent none it could read. */
     data class State(val fileId: String?, val page: Int, val version: Long, val tools: ToolState?)
     data class Notes(
@@ -56,7 +59,7 @@ class SecondaryClient(private val ep: Endpoint, private val tls: Tls.Client = Tl
     fun info(probe: Boolean = false): Info =
         (if (probe) request("GET", "/v1/info", readTimeoutMs = PROBE_READ_MS, connectTimeoutMs = PROBE_CONNECT_MS)
         else request("GET", "/v1/info")).let { (_, json) ->
-        Info(json.getString("uuid"), json.getString("name"), json.optBoolean("open"))
+        Info(json.getString("uuid"), json.getString("name"), json.optBoolean("open"), json.optInt("apiVersion"), json.optString("app"))
     }
 
     /** Asks to be paired, committing to a nonce ([PairCode.commit]); returns the request ID and the secondary's nonce. */

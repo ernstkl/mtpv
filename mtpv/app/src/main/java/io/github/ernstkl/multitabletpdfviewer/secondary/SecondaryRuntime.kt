@@ -268,6 +268,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         .put("uuid", prefs.deviceUuid)
         .put("name", prefs.deviceName)
         .put("apiVersion", Protocol.API_VERSION)
+        .put("app", BuildConfig.VERSION_NAME)
         .put("open", Presence.open(pairing.paired.value.map { it.uuid }))
 
     fun stateJson(d: DisplayState = _shown.value): JSONObject = JSONObject()
