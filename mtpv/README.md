@@ -33,12 +33,13 @@ app's data.
 `./gradlew assembleRelease` then writes `app/build/outputs/apk/release/app-release.apk`. Without
 `keystore.properties` it writes `app-release-unsigned.apk`.
 
-F-Droid builds are reproducible: F-Droid builds the tagged commit itself and publishes the APK signed
-with this key, but only if its build matches the signed APK from the GitHub release byte for byte.
-A release: raise `versionCode` and `versionName` in `app/build.gradle.kts`, add
-`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`, commit, tag `v<versionName>`, push,
-build `assembleRelease` from a clean checkout of the tag, and attach `app-release.apk` as
-`mtpv-<versionName>.apk` to a GitHub release of that tag. F-Droid finds the tag by itself.
+A release: raise `versionCode` and `versionName` in `app/build.gradle.kts`, optionally add
+`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (the release notes), commit, tag
+`v<versionName>`, push, build `assembleRelease` from a clean checkout of the tag, and attach
+`app-release.apk` as `mtpv-<versionName>.apk` to a GitHub release of that tag. The same APK goes into
+the F-Droid repository at https://ernstkl.github.io/fdroid/repo (a binary repository made with
+`fdroidserver`; texts and screenshots from `fastlane/`). The build is reproducible, so the official
+F-Droid could build the tag itself and ship this signed APK.
 
 Needs JDK 17+ and the Android SDK (`local.properties` → `sdk.dir`). Android 10+ (minSdk 29), for both roles. Discovery watches addresses with `registerServiceInfoCallback`
 on Android 14+; older controllers resolve once and resolve again when a secondary stops answering.
@@ -84,9 +85,8 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    **Library → Export all data…** saves the notes, song order and ticks of all sets, and the note tool
    and dark pages setting, to one zip file (it first fetches unsaved notes from the secondaries). Not the
    PDFs: they stay in the library. **Import all data…** replaces all of them on this device by those in
-   such a file, after asking. To move to another install (a new tablet, or the F-Droid build, which needs
-   uninstalling first): export, install, import, then pick the library folder again; each set then gets
-   its order, ticks and notes back. Paired screens are not in the file: pair them again.
+   such a file, after asking. To move to another tablet: export, install, import, then pick the library
+   folder again; each set then gets its order, ticks and notes back. Paired screens are not in the file: pair them again.
 4. Turn pages: tap the left/right third of any screen, controller or secondary, swipe (to the left for the
    next page, like paper), or use a Bluetooth pedal on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
    Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
