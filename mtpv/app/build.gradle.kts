@@ -43,6 +43,12 @@ android {
     } else null
 
     buildTypes {
+        // With keystore.properties, debug builds get the release key too: they install over a release
+        // build and back without uninstalling, which would delete the app's data.
+        debug {
+            releaseSigning?.let { signingConfig = it }
+            versionNameSuffix = "-debug"
+        }
         release {
             signingConfig = releaseSigning
             isMinifyEnabled = true

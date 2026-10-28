@@ -26,7 +26,9 @@ key once and keep it safe (updates must be signed with the same key), then put i
     keyPassword=…
 
 Both passwords are the one you chose when `keytool` asked for it (it asks only once, since the key in a
-PKCS12 keystore shares the store password).
+PKCS12 keystore shares the store password). With `keystore.properties`, debug builds are signed with
+the same key (version name ending in `-debug`), so either kind installs over the other and keeps the
+app's data.
 
 `./gradlew assembleRelease` then writes `app/build/outputs/apk/release/app-release.apk`. Without
 `keystore.properties` it writes `app-release-unsigned.apk`.

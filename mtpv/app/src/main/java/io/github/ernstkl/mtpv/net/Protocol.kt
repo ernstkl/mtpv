@@ -79,9 +79,10 @@ import io.github.ernstkl.mtpv.core.PairCode
  * secondary becomes a "tool:<name>", "fingers:on|off" or "dark:on|off" input event.
  *
  * Direct: where controller and secondary share no Wi-Fi, the controller starts a Wi-Fi Direct group
- * whose name and password come from its code (core/DirectCode). A secondary that knows the code joins
- * the group when no controller has reached it for a while, so a secondary paired at home finds the
- * controller elsewhere without typing. A secondary never paired has the code typed in.
+ * whose name and password come from its code (core/DirectCode), as soon as a secondary is out of
+ * reach (core/DirectAuto). A secondary that knows the code joins the group when no controller has
+ * reached it for a few seconds, or at once without a Wi-Fi network, so a secondary paired at home
+ * finds the controller elsewhere without typing. A secondary never paired has the code typed in.
  *
  * During development all devices run the same app version; there are no fallbacks for older ones.
  */

@@ -201,7 +201,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         scanEvery = SCAN_EVERY_MS
         lastScan = 0L
         syncLinks()
-        activeJob = scope.launch(Dispatchers.Main) { scanWhileMissing() }
+        activeJob = scope.launch(Dispatchers.Main) { watchScreens() }
         if (screensShown) screensJob = scope.launch(Dispatchers.Main) { scanWhileScreens() }
     }
 
@@ -538,8 +538,6 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             if (c.moveToFirst()) c.getString(0) else null
         } ?: uri.lastPathSegment ?: "PDF"
 
-    // --- screens ---
-
     // --- direct network ---
 
     fun startDirect() {
@@ -703,11 +701,12 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     }
 
     /**
-     * Scans now and then while a secondary in the arrangement cannot be reached and mDNS has not
-     * found it again; less and less often while it stays away (it may just be switched off).
-     * Starts and stops the direct network by itself ([DirectAuto]).
+     * While on screen, checks every second whether the secondaries in the arrangement are reached.
+     * Scans now and then while one is not and mDNS has not found it again; less and less often while
+     * it stays away (it may just be switched off). Starts and stops the direct network by itself
+     * ([DirectAuto]).
      */
-    private suspend fun scanWhileMissing() {
+    private suspend fun watchScreens() {
         val since = System.currentTimeMillis()
         /** Since when all screens have been reached; null while one is out of reach. */
         var reachableSince: Long? = null
