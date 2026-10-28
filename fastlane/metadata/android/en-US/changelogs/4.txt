@@ -1,0 +1,1 @@
+- New app ID io.github.ernstkl.multitabletpdfviewer: MTPV installs as a new app next to the old one. To keep notes, song order and ticks, use Library → Export all data… in the old app and Import all data… in the new one, then pair the tablets again

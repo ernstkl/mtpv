@@ -1,0 +1,6 @@
+- A bar at the top of every screen shows "Song 3 of 10 | Page 1 of 2"
+- « and » on the leftmost screen show the previous or next song
+- Screens: drag to change the order
+- Songs: the list stays open after Reload folder
+- Taps and swipes along the top and bottom edge no longer turn pages
+- All tablets need 0.12.0: the controller now lists tablets with an older version and asks to update MTPV on them
