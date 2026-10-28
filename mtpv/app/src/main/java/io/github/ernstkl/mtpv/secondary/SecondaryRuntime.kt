@@ -21,6 +21,7 @@ import io.github.ernstkl.mtpv.core.ToolState
 import io.github.ernstkl.mtpv.core.ToolSync
 import io.github.ernstkl.mtpv.core.VersionGate
 import io.github.ernstkl.mtpv.net.DirectState
+import io.github.ernstkl.mtpv.net.DirectWifi
 import io.github.ernstkl.mtpv.net.Protocol
 import io.github.ernstkl.mtpv.net.Tls
 import fi.iki.elonen.NanoHTTPD
@@ -98,14 +99,23 @@ class SecondaryRuntime(private val app: MtpvApp) {
     /** In the direct network (or looking for it) when MTPV left the screen. */
     private var directWanted = false
     private var resumedAt = 0L
+    /** Since when this device has been looking for the direct network; null while joined or off. */
+    private var lookingSince: Long? = null
     private val main = Handler(Looper.getMainLooper())
     private val checkDirect = object : Runnable {
         override fun run() {
+            val now = System.currentTimeMillis()
             val joined = direct.state.value is DirectState.Up
+            val looking = !joined && direct.state.value != DirectState.Off
             if (joined) manualJoin = false
-            val since = System.currentTimeMillis() - maxOf(_lastContact.value, resumedAt)
+            lookingSince = if (looking) lookingSince ?: now else null
+            val since = now - maxOf(_lastContact.value, resumedAt)
+            val contactWhileLooking = lookingSince?.let { _lastContact.value > it } == true
             val code = _joinCode.value
-            when (DirectAuto.secondary(code, direct.state.value != DirectState.Off, joined, manualJoin, since)) {
+            val noWifi = !DirectWifi.inWifiNetwork(app)
+            val contacted = _lastContact.value > resumedAt
+            val active = direct.state.value != DirectState.Off
+            when (DirectAuto.secondary(code, active, joined, manualJoin, since, contactWhileLooking, noWifi, contacted)) {
                 DirectAuto.Join.START -> code?.let(direct::start)
                 DirectAuto.Join.STOP -> direct.stop()
                 DirectAuto.Join.NONE -> Unit
@@ -131,7 +141,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
         updatePresence()
         val code = _joinCode.value
         if (directWanted && code != null) direct.start(code)
-        main.postDelayed(checkDirect, DIRECT_CHECK_MS)
+        main.post(checkDirect)
     }
 
     /** MTPV left the screen (main thread): stop everything, so nothing runs in the background. */
@@ -461,7 +471,7 @@ class SecondaryRuntime(private val app: MtpvApp) {
     companion object {
         private const val TAG = "MtpvSecondary"
         private const val MAX_STROKE_MS = 15_000L
-        private const val DIRECT_CHECK_MS = 5_000L
+        private const val DIRECT_CHECK_MS = 1_000L
 
         /** [d] with nothing on screen; version and controller stay. */
         private fun blank(d: DisplayState) = d.copy(fileId = null, page = 0, position = null)

@@ -23,8 +23,8 @@ android {
         applicationId = "io.github.ernstkl.mtpv"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.10.0"
+        versionCode = 3
+        versionName = "0.10.1"
         buildConfigField("String", "GIT_COMMIT", gitCommit?.let { "\"$it\"" } ?: "null")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

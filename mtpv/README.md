@@ -96,14 +96,17 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    page and arrangement and reconnects.
 
 Direct network: where there is no Wi-Fi the tablets can share (none at the venue, or a guest network
-that keeps devices apart), the controller makes its own, by itself. It starts it when a paired screen
-cannot be reached for about 10 s, or when **Screens** is opened and nothing can be reached. A paired
-secondary has got the network's 16-digit code from the controller and joins when no controller has
-reached it for about 15 s. So tablets paired at home find each other at the venue without any tap.
+that keeps devices apart), the controller makes its own, by itself. It starts it as soon as a paired
+screen cannot be reached, so also right after MTPV comes to the screen, or when **Screens** is
+opened and nothing can be reached; when all screens are reached through the Wi-Fi and none is in the
+network, it stops it again after half a minute. A paired secondary has got the network's 16-digit
+code from the controller and joins at once when it is in no Wi-Fi network, otherwise when no
+controller has reached it for a few seconds. So tablets paired at home find each other at the venue
+without any tap.
 A secondary never paired, with no shared Wi-Fi: tap its middle (or ☰) → **Join direct network…** and
 type the code the controller shows (in **Screens** while the network runs, or menu → **Direct
 network**); it then appears under *Nearby* for pairing. Wi-Fi has to be switched on, but no Wi-Fi
-network is needed, and a home Wi-Fi may stay connected alongside. Once started, the network stays
+network is needed, and a home Wi-Fi may stay connected alongside. Started by hand, the network stays
 while MTPV is on the controller's screen. When
 MTPV leaves the screen the network stops, on a secondary it is left; both start again at once when
 MTPV is back. Menu → **Direct network**:

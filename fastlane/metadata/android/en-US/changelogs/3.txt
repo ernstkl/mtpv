@@ -1,0 +1,3 @@
+- Direct network: a secondary joins it reliably, also when joining takes longer than usual
+- Direct network: tablets find each other faster, also after switching away from MTPV and back
+- Direct network: no more "Wi-Fi is off" when only Wi-Fi Direct was idle (Android 14)

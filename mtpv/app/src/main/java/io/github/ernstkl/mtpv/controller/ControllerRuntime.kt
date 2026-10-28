@@ -171,6 +171,8 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     private val _directAuto = MutableStateFlow(prefs.directAuto)
     val directAuto: StateFlow<Boolean> = _directAuto
     private var directStoppedByHand = false
+    /** The network was started by itself ([DirectAuto]), not by hand: it stops again when not needed. */
+    private var directByItself = false
     private var directWanted = false
 
     private val _state = MutableStateFlow(ControllerState(
@@ -542,6 +544,12 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     fun startDirect() {
         directStoppedByHand = false
+        directByItself = false
+        direct.start(_directCode.value)
+    }
+
+    private fun startDirectByItself() {
+        directByItself = true
         direct.start(_directCode.value)
     }
 
@@ -580,7 +588,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         val start = !directStoppedByHand && DirectAuto.startOnScreens(
             _directAuto.value, direct.state.value != DirectState.Off, st.links.values.any { it.online }, st.nearby.size,
         )
-        if (start) startDirect()
+        if (start) startDirectByItself()
         discovery?.refresh()
         screensShown = true
         screensJob?.cancel()
@@ -616,8 +624,11 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             pushDirectCode()
             val now = (s as? DirectState.Up)?.clients ?: 0
             if (now > clients) scope.launch(Dispatchers.Main) {
-                delay(DIRECT_JOIN_SCAN_MS) // The new tablet gets its address first.
-                scan()
+                // The new tablet gets its address first; on a slow one, the second scan finds it.
+                for (wait in DIRECT_JOIN_SCAN_MS) {
+                    delay(wait)
+                    scan()
+                }
             }
             clients = now
         }
@@ -694,24 +705,28 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     /**
      * Scans now and then while a secondary in the arrangement cannot be reached and mDNS has not
      * found it again; less and less often while it stays away (it may just be switched off).
-     * If it stays away, starts the direct network ([DirectAuto]).
+     * Starts and stops the direct network by itself ([DirectAuto]).
      */
     private suspend fun scanWhileMissing() {
-        delay(SCAN_FIRST_MS)
-        /** Since when a screen has been out of reach; null while all answer. */
-        var missingSince: Long? = null
+        val since = System.currentTimeMillis()
+        /** Since when all screens have been reached; null while one is out of reach. */
+        var reachableSince: Long? = null
         while (true) {
             val st = _state.value
             val missing = st.session.arrangement.any { it != Paging.SELF && st.links[it]?.online != true }
             val now = System.currentTimeMillis()
-            if (missing && now - lastScan >= scanEvery) {
+            // The first scan waits a moment: the links find most screens by themselves.
+            if (missing && now - since >= SCAN_FIRST_MS && now - lastScan >= scanEvery) {
                 scan()
                 scanEvery = minOf(scanEvery * 2, SCAN_MAX_MS)
             }
-            missingSince = if (missing) missingSince ?: now else null
-            val running = direct.state.value != DirectState.Off
-            if (DirectAuto.controllerStart(_directAuto.value, running, directStoppedByHand, missingSince?.let { now - it })) {
-                startDirect()
+            reachableSince = if (missing) null else reachableSince ?: now
+            val d = direct.state.value
+            if (DirectAuto.controllerStart(_directAuto.value, d != DirectState.Off, directStoppedByHand, missing)) {
+                startDirectByItself()
+            } else if (DirectAuto.controllerStop(directByItself, (d as? DirectState.Up)?.clients ?: 0, reachableSince?.let { now - it })) {
+                directByItself = false
+                direct.stop()
             }
             delay(SCAN_CHECK_MS)
         }
@@ -1065,11 +1080,11 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         private const val PAIR_TIMEOUT_MS = 60_000L
         private const val FLUSH_TIMEOUT_MS = 5_000L
         /** mDNS gets this long after start before the first scan. */
-        private const val SCAN_FIRST_MS = 5_000L
+        private const val SCAN_FIRST_MS = 2_000L
         private const val SCAN_EVERY_MS = 30_000L
         private const val SCAN_MAX_MS = 300_000L
-        private const val SCAN_CHECK_MS = 5_000L
-        private const val DIRECT_JOIN_SCAN_MS = 3_000L
+        private const val SCAN_CHECK_MS = 1_000L
+        private val DIRECT_JOIN_SCAN_MS = listOf(1_000L, 3_000L)
         private const val SCREENS_SCAN_MS = 10_000L
     }
 }

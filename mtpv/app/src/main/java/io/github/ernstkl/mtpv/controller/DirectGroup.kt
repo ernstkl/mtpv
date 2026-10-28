@@ -20,8 +20,8 @@ class DirectGroup(context: Context) : DirectWifi(context) {
     fun start(code: String) {
         if (code != this.code && this.code != null) stop()
         _state.value = DirectState.Starting
-        // Until Wi-Fi Direct is known to be enabled, which calls onEnabled.
-        if (!use(code)) create() else handler.postDelayed(retry, RETRY_MS)
+        use(code)
+        create()
     }
 
     override fun onEnabled() = create()

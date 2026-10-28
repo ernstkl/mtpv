@@ -8,6 +8,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pManager
@@ -44,6 +47,7 @@ sealed interface DirectState {
 abstract class DirectWifi(context: Context) {
     protected val app: Context = context.applicationContext
     private val manager: WifiP2pManager? = app.getSystemService(WifiP2pManager::class.java)
+    private val wifi: WifiManager? = app.getSystemService(WifiManager::class.java)
     private var channel: WifiP2pManager.Channel? = null
     protected val handler = Handler(Looper.getMainLooper())
 
@@ -56,7 +60,10 @@ abstract class DirectWifi(context: Context) {
     protected var networkName: String? = null
         private set
 
-    /** Wi-Fi Direct is enabled (Wi-Fi is on). Known once the sticky broadcast has arrived. */
+    /**
+     * Wi-Fi Direct is enabled. Known once the sticky broadcast has arrived. Android 14 switches it
+     * off when no app uses it and on again at the next request, so off does not mean Wi-Fi is off.
+     */
     protected var enabled = false
         private set
     private var registered = false
@@ -67,11 +74,8 @@ abstract class DirectWifi(context: Context) {
     /** Called with the group this device is in now, or null; also from [checkGroup]. */
     protected abstract fun onGroup(group: WifiP2pGroup?)
 
-    /**
-     * Takes [code] into use. Returns true if Wi-Fi Direct was not in use yet: then [onEnabled]
-     * follows as soon as it is known to be enabled.
-     */
-    protected fun use(code: String): Boolean {
+    /** Takes [code] into use; [onEnabled] follows when Wi-Fi Direct is known to be enabled. */
+    protected fun use(code: String) {
         if (code != this.code) {
             networkName = DirectCode.networkName(code)
             this.code = code
@@ -83,9 +87,7 @@ abstract class DirectWifi(context: Context) {
             }
             ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             registered = true
-            return true
         }
-        return false
     }
 
     /** Stops trying, leaves or removes the group, and lets go of Wi-Fi Direct. */
@@ -137,16 +139,23 @@ abstract class DirectWifi(context: Context) {
         m.requestGroupInfo(ch) { if (code != null) onGroup(it) }
     }
 
+    /**
+     * BUSY is no failure: the system is still at an earlier request (a join can take a minute),
+     * which goes on; the next retry asks again.
+     */
     protected fun listener(onFailed: (String) -> Unit) = object : WifiP2pManager.ActionListener {
         override fun onSuccess() = Unit
-        override fun onFailure(reason: Int) = onFailed(reasonText(reason))
+        override fun onFailure(reason: Int) {
+            if (reason != WifiP2pManager.BUSY) onFailed(reasonText(reason))
+        }
     }
+
+    private fun wifiOn() = wifi?.isWifiEnabled != false
 
     private fun reasonText(r: Int): String = when {
         r == WifiP2pManager.P2P_UNSUPPORTED -> "This device has no Wi-Fi Direct."
-        !enabled -> "Wi-Fi is off. Switch it on (no Wi-Fi network needed)."
+        !wifiOn() -> "Wi-Fi is off. Switch it on (no Wi-Fi network needed)."
         locationNeeded(app) -> "If it keeps failing, switch on location: some devices with Android 12 and older need it."
-        r == WifiP2pManager.BUSY -> "Wi-Fi Direct is busy."
         else -> "Wi-Fi Direct failed (error $r)."
     }
 
@@ -158,8 +167,8 @@ abstract class DirectWifi(context: Context) {
                     val on = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, 0) == WifiP2pManager.WIFI_P2P_STATE_ENABLED
                     val was = enabled
                     enabled = on
-                    if (!on) _state.value = DirectState.Failed(reasonText(WifiP2pManager.ERROR))
-                    else if (!was) onEnabled()
+                    if (on && !was) onEnabled()
+                    else if (!on && !wifiOn()) _state.value = DirectState.Failed(reasonText(WifiP2pManager.ERROR))
                 }
                 WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION ->
                     onGroup(IntentCompat.getParcelableExtra(intent, WifiP2pManager.EXTRA_WIFI_P2P_GROUP, WifiP2pGroup::class.java))
@@ -185,6 +194,16 @@ abstract class DirectWifi(context: Context) {
          */
         fun locationNeeded(context: Context) =
             Build.VERSION.SDK_INT < 33 && context.getSystemService(LocationManager::class.java)?.isLocationEnabled != true
+
+        /**
+         * Connected to a Wi-Fi network. A direct group is not one of the networks ConnectivityManager
+         * lists, so without one only the direct network can bring the tablets together.
+         */
+        @Suppress("DEPRECATION") // allNetworks: the active network may be mobile data while Wi-Fi is connected too.
+        fun inWifiNetwork(context: Context): Boolean {
+            val cm = context.getSystemService(ConnectivityManager::class.java) ?: return true
+            return cm.allNetworks.any { cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true }
+        }
 
         /** IPv4 address of interface [name] (a group's p2p interface), if it has one yet. */
         fun ipv4Of(name: String?): String? = runCatching {

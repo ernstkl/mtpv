@@ -9,8 +9,10 @@ import io.github.ernstkl.mtpv.net.DirectWifi
 
 /**
  * A secondary in the controller's direct network: joins the Wi-Fi Direct group its code defines.
- * Until it is in, it tries again every 10 s, less often while the controller stays away (up to
- * every 5 min); at once when Wi-Fi comes back or the group is lost.
+ * Until it is in, it asks again every 10 s, less often while the controller stays away (up to
+ * every 30 s); at once when Wi-Fi comes back or the group is lost. A join still running is never
+ * cancelled: that cost every second try (BUSY right after the cancel) and left the system's own
+ * search running, after which joins failed for minutes while the group was there.
  */
 @SuppressLint("MissingPermission") // p2p() checks it.
 class DirectJoin(context: Context) : DirectWifi(context) {
@@ -21,8 +23,8 @@ class DirectJoin(context: Context) : DirectWifi(context) {
         if (code != this.code && this.code != null) stop()
         _state.value = DirectState.Starting
         every = FIRST_RETRY_MS
-        // Until Wi-Fi Direct is known to be enabled, which calls onEnabled.
-        if (!use(code)) attempt() else handler.postDelayed(retry, every)
+        use(code)
+        attempt()
     }
 
     override fun onEnabled() {
@@ -50,11 +52,8 @@ class DirectJoin(context: Context) : DirectWifi(context) {
                         handler.postDelayed({ if (code != null) m.connect(ch, config, listener(::failed)) }, REMOVE_WAIT_MS)
                     }
                 })
-                else -> {
-                    // A connect still pending from the last attempt would make this one fail as busy.
-                    m.cancelConnect(ch, null)
-                    m.connect(ch, config, listener(::failed))
-                }
+                // While the last join still runs, this one is answered BUSY and that one goes on.
+                else -> m.connect(ch, config, listener(::failed))
             }
         }
     }
@@ -80,7 +79,7 @@ class DirectJoin(context: Context) : DirectWifi(context) {
 
     companion object {
         private const val FIRST_RETRY_MS = 10_000L
-        private const val MAX_RETRY_MS = 300_000L
+        private const val MAX_RETRY_MS = 30_000L
         private const val LOST_WAIT_MS = 2_000L
         private const val REMOVE_WAIT_MS = 1_000L
         private const val ADDRESS_WAIT_MS = 2_000L
