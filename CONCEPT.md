@@ -23,12 +23,12 @@ up to the last page. A page turn on any screen moves *start* by one, so every sc
 
 ```
  ┌────────────┐    HTTPS (pinned device keys)   ┌─────────────┐
- │ Controller │ ──────────────────────────────▶ │ Secondary 1 │  page n+1
- │  page n    │ ◀── long poll: page turns ───── │ HTTP server │
- │            │ ◀── GET notes ───────────────── │ + mDNS      │
+ │ Controller │ ──────────────────────────────> │ Secondary 1 │  page n+1
+ │  page n    │ <── long poll: page turns ───── │ HTTP server │
+ │            │ <── GET notes ───────────────── │ + mDNS      │
  └────────────┘                                 └─────────────┘
         │                                       ┌─────────────┐
-        └─────────────────────────────────────▶ │ Secondary 2 │  page n+2
+        └─────────────────────────────────────> │ Secondary 2 │  page n+2
                                                 └─────────────┘
 ```
 
@@ -46,16 +46,19 @@ it adds what the plain list of files lacks, and keeps all of it in app storage:
 Rules that follow from this:
 
 - A file renamed in the folder is the same song: it keeps its place, tick and notes.
-- A file that leaves the folder, or whose content changes, takes everything the set added to it
-  with it, notes included.
+- A file that leaves the folder takes everything the set added to it with it: place, tick and
+  notes.
+- A file that is overwritten keeps its place and tick, but loses its notes: they were made for the
+  old content.
 - A new set starts without notes, even if its PDFs have notes in other sets. Notes reach a song
   only by an explicit act: **Copy notes from…** on that song (from any song with exactly the same
-  PDF), or, later, a PDF with notes embedded by MTPV put into the folder.
+  PDF). Planned feature: a PDF with notes embedded by MTPV, put into the folder, brings its notes
+  along.
 - When the library moves, a set follows its folder (same place below the library folder, most
   files still there): it is the same view on the same folder.
 
 The PDF does not carry the notes, and the app should not pretend it does: copying a PDF to
-another folder copies the input, not the set. User texts (README, About) say so plainly.
+another folder copies the input, not the set. User texts (README, Help) say so plainly.
 
 ## Building blocks
 
@@ -72,25 +75,26 @@ another folder copies the input, not the set. User texts (README, About) say so 
 
 - **Controller pushes, secondaries hold no session.** The controller computes each secondary's target
   (file, page) and a link retries until the secondary shows it. A secondary that comes back online
-  simply converges again; nothing needs to be resynchronised by hand.
+  simply converges again; nothing needs to be resynchronized by hand.
 - **Versioned display commands.** Each command carries a strictly increasing, persisted version, so a
   late or repeated request can never move a screen backwards.
+- **Content-addressed files.** PDFs are identified by their SHA-256 hash, uploaded once and cached
+  on both sides.
 - **Sets live on the controller only.** A secondary gets single (file, page) targets and never
-  learns about sets, so song sets needed no protocol change. Each PDF is copied into the
-  controller's cache, so a file changing in the folder cannot change content under a known hash.
-  A folder's stored order is keyed by its document ID, so it is the same folder whether it was
-  picked directly or reached through the library. Each set record also has a random set ID and its
-  path below the library folder; when the library moves, a folder without a record takes over the
-  one with the same path, set ID and all.
-- **Nothing on the page but the page.** The controller's menu is a drawer, opened by a tap in the
-  middle or a small ☰ button; there is no edge swipe, so it never clashes with the pen or page turns.
-- **Content-addressed files.** PDFs are identified by their SHA-256, uploaded once and cached on both
-  sides.
+  learns about sets. Each PDF is copied into the controller's cache, so a file changing in the
+  folder cannot change content under a known hash. A set record is keyed by its folder's document
+  ID, so it is the same set whether the folder was picked directly or reached through the library.
+  The record also keeps a random set ID and the folder's path below the library folder. When the
+  library moves, its folders get new document IDs; the record is then re-associated with the folder
+  at the same path, if most of its files are there, and keeps its set ID and with it the notes.
+- **Little on the page but the page.** Small buttons along the top and bottom edge, nothing else.
+  The controller's menu is a drawer, opened by a tap in the middle or a small ☰ button; there is no
+  edge swipe, so it never clashes with the pen or page turns.
 - **Notes per song.** Notes belong to a song (a file name in a set), keyed by the set ID and a random
   notes ID, so copies of one PDF have notes of their own. A display command names the PDF to render
   and, separately, the song's notes key. A song's notes follow a rename and are deleted when its file
-  leaves the folder or changes. A song gets another song's notes only through Copy notes from…,
-  which gives it a new notes ID: its old notes are deleted, so late edits to them are dropped.
+  leaves the folder or is overwritten. A song gets another song's notes only through Copy notes
+  from…, which gives it a new notes ID; its old notes are deleted.
 - **Single owner for notes.** The controller holds the authoritative copy of all notes. A secondary
   edits only the page it shows; the controller fetches those edits before it gives that secondary
   another page. Strokes are vectors in page-relative coordinates, independent of screen size.
@@ -100,13 +104,6 @@ another folder copies the input, not the set. User texts (README, About) say so 
 - **On screen only.** A role uses the network only while MTPV is on its device's screen: no
   service, no notifications, nothing in the background. Leaving the screen pauses that device;
   coming back reconnects it like after any break, which the rules above already make safe.
-- **Local network only.** HTTPS (TLS 1.3) with device keys pinned at pairing, and mDNS, on the same
-  Wi-Fi; no cloud, no Google Play Services.
-
-## Why a standalone app
-
-OpenSong (`OpenSongTablet/`) was considered as a base. Its multi-screen features (Nearby, secondary
-display, web server) all mirror one page to every device, so the distributed part — discovery,
-pairing, file transfer, per-device pages, notes round trip — would have to be written either way.
-Putting it into OpenSong would add a permanent fork of a large app, its minSdk 19 constraints and a
-full songbook app on every secondary, for a PDF viewer and pedal handling that are small to build.
+- **Local network only.** HTTPS (TLS 1.3) with device keys pinned at pairing, and mDNS: on a Wi-Fi
+  the tablets share if there is one, otherwise on a Wi-Fi Direct network the controller starts. No
+  cloud, no Google Play Services.
