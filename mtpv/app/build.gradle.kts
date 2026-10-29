@@ -23,8 +23,8 @@ android {
         applicationId = "io.github.ernstkl.multitabletpdfviewer"
         minSdk = 29
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.12.1"
+        versionCode = 7
+        versionName = "0.12.2"
         buildConfigField("String", "GIT_COMMIT", gitCommit?.let { "\"$it\"" } ?: "null")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,0 +1,1 @@
+- Direct network: a secondary that showed "Joined" without being in the network now joins again by itself
