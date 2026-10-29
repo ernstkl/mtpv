@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
 /** The first start, or Device role: [current] is the role still running, NONE on the first start. */
 @Composable
 private fun RoleChooser(prefs: Prefs, current: Role, onCancel: () -> Unit, onChoose: (Role) -> Unit) {
-    var showAbout by remember { mutableStateOf(!prefs.aboutShown) }
+    var showHelp by remember { mutableStateOf(!prefs.helpShown) }
     BackHandler(enabled = current != Role.NONE, onBack = onCancel)
     Column(
         Modifier.fillMaxSize().padding(32.dp),
@@ -148,17 +148,17 @@ private fun RoleChooser(prefs: Prefs, current: Role, onCancel: () -> Unit, onCho
             Text("Secondary: show one page")
         }
         Spacer(Modifier.height(16.dp))
-        TextButton(onClick = { showAbout = true }) { Text("About / How it works") }
+        TextButton(onClick = { showHelp = true }) { Text("Help") }
         if (current != Role.NONE) {
             TextButton(onClick = onCancel) {
                 Text("Cancel: stay " + if (current == Role.CONTROLLER) "controller" else "secondary")
             }
         }
     }
-    if (showAbout) {
-        AboutDialog {
-            showAbout = false
-            prefs.aboutShown = true
+    if (showHelp) {
+        HelpDialog {
+            showHelp = false
+            prefs.helpShown = true
         }
     }
 }

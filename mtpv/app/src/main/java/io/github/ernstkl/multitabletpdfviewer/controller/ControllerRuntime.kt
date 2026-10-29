@@ -161,15 +161,13 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
 
     /**
      * The direct network, for places without a shared Wi-Fi. [directCode] goes to the paired
-     * secondaries and is shown for others to type. With [directAuto] it starts by itself
-     * ([DirectAuto]), unless stopped by hand in this session. It stops when MTPV leaves the
+     * secondaries and is shown for others to type. It starts by itself ([DirectAuto]), unless
+     * stopped by hand in this session. It stops when MTPV leaves the
      * screen and starts again at once when it is back ([directWanted]).
      */
     val direct = DirectGroup(app)
     private val _directCode = MutableStateFlow(prefs.directCode ?: newCode())
     val directCode: StateFlow<String> = _directCode
-    private val _directAuto = MutableStateFlow(prefs.directAuto)
-    val directAuto: StateFlow<Boolean> = _directAuto
     private var directStoppedByHand = false
     /** The network was started by itself ([DirectAuto]), not by hand: it stops again when not needed. */
     private var directByItself = false
@@ -564,12 +562,6 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         direct.stop()
     }
 
-    fun setDirectAuto(on: Boolean) {
-        prefs.directAuto = on
-        _directAuto.value = on
-        pushDirectCode()
-    }
-
     /**
      * A new code; a running direct network restarts with it. Secondaries reached only through it
      * drop out and need the new code typed; the others get it handed over.
@@ -591,7 +583,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
     fun screensOpened() {
         val st = _state.value
         val start = !directStoppedByHand && DirectAuto.startOnScreens(
-            _directAuto.value, direct.state.value != DirectState.Off, st.links.values.any { it.online }, st.nearby.size,
+            direct.state.value != DirectState.Off, st.links.values.any { it.online }, st.nearby.size,
         )
         if (start) startDirectByItself()
         discovery?.refresh()
@@ -613,12 +605,8 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
         }
     }
 
-    /** What the secondaries get: the code while the network may run, "" otherwise. */
-    private fun directCodeToSend(): String =
-        if (_directAuto.value || direct.state.value != DirectState.Off) _directCode.value else ""
-
     private fun pushDirectCode() {
-        val code = directCodeToSend()
+        val code = _directCode.value
         links.values.forEach { it.first.setDirectCode(code) }
     }
 
@@ -728,7 +716,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             }
             reachableSince = if (missing) null else reachableSince ?: now
             val d = direct.state.value
-            if (DirectAuto.controllerStart(_directAuto.value, d != DirectState.Off, directStoppedByHand, missing)) {
+            if (DirectAuto.controllerStart(d != DirectState.Off, directStoppedByHand, missing)) {
                 startDirectByItself()
             } else if (DirectAuto.controllerStop(directByItself, (d as? DirectState.Up)?.clients ?: 0, reachableSince?.let { now - it })) {
                 directByItself = false
@@ -1068,7 +1056,7 @@ class ControllerRuntime(private val app: MtpvApp) : NotesHub {
             // Without a set to come back to (closed, or none yet), the secondaries go blank.
             link.setTarget(st.targetForSlot(slot) ?: Target(null, null, 0).takeIf { s.folder == null })
             link.setTools(st.tools)
-            link.setDirectCode(directCodeToSend())
+            link.setDirectCode(_directCode.value)
         }
     }
 

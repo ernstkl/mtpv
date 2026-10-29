@@ -86,16 +86,15 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     var showDirect by remember { mutableStateOf(false) }
     val direct by rt.direct.state.collectAsStateWithLifecycle()
     val directCode by rt.directCode.collectAsStateWithLifecycle()
-    val directAuto by rt.directAuto.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // Started, or may start by itself because screens are paired.
     AskDirectPermission(
-        !DirectWifi.hasPermission(context) && (direct != DirectState.Off || (directAuto && s.arrangement.size > 1)),
+        !DirectWifi.hasPermission(context) && (direct != DirectState.Off || s.arrangement.size > 1),
         onAnswered = { if (direct != DirectState.Off) rt.startDirect() },
     )
     var showSongs by remember { mutableStateOf(false) }
     var showSets by remember { mutableStateOf(false) }
-    var showAbout by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
     var showLibrary by remember { mutableStateOf(st.library == null) }
     var confirmImport by remember { mutableStateOf(false) }
     val changes by rt.notesChanges.collectAsStateWithLifecycle()
@@ -147,7 +146,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                     MenuItem("Open single PDF") { menu { picker.launch(arrayOf("application/pdf")) } }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     MenuItem("Screens (${s.arrangement.size})") { menu { showScreens = true } }
-                    MenuItem("Direct network", directSubtitle(direct, directCode, directAuto)) { menu { showDirect = true } }
+                    MenuItem("Direct network", directSubtitle(direct, directCode)) { menu { showDirect = true } }
                     MenuItem("Device role", "Controller") { menu(onLeaveRole) }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     MenuGroup("Library", showLibrary) { showLibrary = !showLibrary }
@@ -160,7 +159,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
                             menu { confirmImport = true }
                         }
                     }
-                    MenuItem("About") { menu { showAbout = true } }
+                    MenuItem("Help") { menu { showHelp = true } }
                 }
             }
         },
@@ -230,7 +229,7 @@ fun ControllerScreen(rt: ControllerRuntime, onLeaveRole: () -> Unit) {
     if (showDirect) DirectNetworkDialog(rt) { showDirect = false }
     if (showSets) SetsDialog(rt, st, onChooseLibrary = { libraryPicker.launch(null) }) { showSets = false }
     if (showSongs) SongsDialog(rt, st) { showSongs = false }
-    if (showAbout) AboutDialog { showAbout = false }
+    if (showHelp) HelpDialog { showHelp = false }
     if (confirmImport) {
         AlertDialog(
             onDismissRequest = { confirmImport = false },

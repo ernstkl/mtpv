@@ -3,8 +3,8 @@
 One app, two roles. A **controller** tablet opens a PDF and turns pages. Each **secondary** tablet
 shows one page: the screen to the right of the controller shows the next page, and so on.
 A page turn moves every screen by one page. It is made for one person with two or three tablets,
-like a sheet of music spread over several pages. On a single tablet the controller works on its own
-as a sheet music reader: song sets, pedal, notes and dark pages need no secondary.
+like a sheet of music spread over several pages. On a single tablet, the controller alone is a
+sheet music reader with song sets, pedal, notes and dark pages.
 
 Architecture overview: [`../CONCEPT.md`](../CONCEPT.md).
 
@@ -46,30 +46,35 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
 
 ## Use
 
-1. Install on all tablets, all on the same Wi-Fi (no shared Wi-Fi: see *Direct network* below).
-   Only one tablet: choose **Controller** and skip pairing.
+1. Install on all tablets, all on the same Wi-Fi (if no Wi-Fi is available that all of them can use,
+   see *Direct network* below). Only one tablet: choose **Controller** and skip pairing.
 2. First start: choose **Controller** on one tablet and **Secondary** on the others. The choice is
    remembered, so later starts go straight into the role. **Device role** in the menu changes it; back
-   or Cancel keeps the current role running.
+   or Cancel keeps the current role running. Changing the role loses no library data: sets, order,
+   ticks and notes stay in the app's storage and are back when the tablet is controller again.
 3. Pair each secondary once: on the controller, tap the middle of the screen (or ☰ top left) to open
    the menu → **Screens** → under
    *Nearby, not paired* tap **Pair**, then tap **Allow** on the secondary once you have checked that both show the same 6-digit code.
    Paired secondaries are added to the right of the controller; **Screens** sets the order: drag = up or down (the
    controller can be in any position). While **Screens** is open, the controller keeps searching: by
    mDNS, and every 10 s by trying every address of the local network (for networks where mDNS is
-   blocked, as on some phone hotspots, or misses tablets, as on Android 11). It also tries every
+   blocked, as on some phone hotspots, or where mDNS misses tablets, as on Android 11). It also tries every
    address by itself while a paired secondary cannot be reached. Adding a secondary by IP still works too.
    Secondaries obey only paired controllers, so a network full of other MTPV devices is fine.
-   All tablets need MTPV with the same API (protocol) version. A secondary with another one gets no pages:
-   the controller then pops up **API mismatch**, listing every screen with its app and API version, the
-   differing ones in red, and **Screens** shows it as "API 2, this one 3: update MTPV". Update MTPV on all devices.
+   A controller and its secondaries need MTPV with the same API (protocol) version. A secondary with
+   another one gets no pages: the controller then pops up **API mismatch** with every screen's app and
+   API version. Update MTPV on all of them.
    A paired secondary is off the market: other controllers do not list it, and it refuses their
    pairing until its controller is removed on it (tap its middle or ☰ → *Paired controllers* →
-   **Remove**). So where several people use MTPV in one room, *Nearby* shows only the tablets not
+   **Remove**). So where several people use MTPV in one network, *Nearby* shows only the tablets not
    paired yet. A secondary can be found only while MTPV is on its screen.
-   Then **Open single PDF**, or open a PDF with MTPV from a file manager (this also makes the device the controller).
-   For a song set, collect one PDF per song in a folder below the **Library folder** (in the menu under **Library**; folders in
-   folders are fine, such as Gigs / 2026 / May) and pick it under **Open set from library…**: the PDFs follow each
+4. Open a PDF: **Open single PDF** in the menu, or open a PDF with MTPV from a file manager (this
+   also makes the device the controller).
+5. Song sets: collect one PDF per song in a folder below the **Library folder** (in the menu under **Library**; folders in
+   folders are fine, such as Gigs / 2026 / May) and pick it under **Open set from library…**. That
+   browses the library: a folder without subfolders opens as a set at a tap, one with subfolders opens
+   to show them (↑ goes back up), and *Show this folder as a set* opens the PDFs of the folder shown.
+   Folders starting with "." and folders without PDFs are not shown. The PDFs of a set follow each
    other like one long PDF, in alphabetical order (numbers by value, so "2" comes before "10"). Opening
    the same folder again keeps its order; files added since go to the end, removed ones drop out.
    Subfolders are not included. **Songs** lists the set: tap a song
@@ -79,11 +84,7 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    **♫** next to ☰ opens **Songs** directly (or the library, without a set); only the controller has it,
    so it also shows which screen is the controller. **«** and **»** in the bar at the top of the leftmost
    screen show the previous or next song there (see *Page numbers* below).
-   **Open set from library…** browses the library: a folder without subfolders
-   opens as a set at a tap, one with subfolders opens to show them (↑ goes back up), and *Show this
-   folder as a set* opens the PDFs of the folder shown. Folders starting with
-   "." and folders without PDFs are not shown.
-   A renamed file keeps its place, tick and notes. If the library moves (say from the SD card to
+6. Library data: a renamed file keeps its place, tick and notes. If the library moves (say from the SD card to
    internal storage), pick it again under **Library folder**: each set found at the same place in it
    keeps its order, ticks and notes.
    **Library → Export all data…** saves the notes, song order and ticks of all sets, and the note tool
@@ -91,34 +92,32 @@ on Android 14+; older controllers resolve once and resolve again when a secondar
    PDFs: they stay in the library. **Import all data…** replaces all of them on this device by those in
    such a file, after asking. To move to another tablet: export, install, import, then pick the library
    folder again; each set then gets its order, ticks and notes back. Paired screens are not in the file: pair them again.
-4. Turn pages: tap the left/right third of any screen, controller or secondary, swipe (to the left for the
+7. Turn pages: tap the left/right third of any screen, controller or secondary, swipe (to the left for the
    next page, like paper), or use a Bluetooth pedal on any of them (Page Up/Down, arrow keys, Space/Enter). Secondaries pass the page turn to the controller.
-   Pages turn on until the last page is on the leftmost screen; screens past the end show ∅.
-   Taps and swipes that start in the stripes along the top and bottom edge, where the buttons are, do nothing.
-5. MTPV works on a tablet only while it is on that tablet's screen (which MTPV keeps switched on).
+   Pages turn until the last page is on the leftmost screen; screens past the end show ∅.
+8. MTPV works on a tablet only while it is on that tablet's screen (which MTPV keeps switched on).
    Switch to another app and that tablet pauses: nothing runs in the background, so nothing uses the
-   battery after the gig, and there is no notification. Back in MTPV, it reconnects and catches up
+   battery after the gig. Back in MTPV, it reconnects and catches up
    within seconds; notes written on a secondary meanwhile are kept and reach the controller then.
-6. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
+9. Next rehearsal: switch on, start the app on every tablet, carry on. The controller restores the PDF,
    page and arrangement and reconnects.
 
 Direct network: where there is no Wi-Fi the tablets can share (none at the venue, or a guest network
-that keeps devices apart), the controller makes its own, by itself. It starts it as soon as a paired
+that keeps devices apart), the controller makes its own, by itself, so tablets paired at home find
+each other at the venue without any tap. The controller starts the network as soon as a paired
 screen cannot be reached, so also right after MTPV comes to the screen, or when **Screens** is
 opened and nothing can be reached; when all screens are reached through the Wi-Fi and none is in the
 network, it stops it again after half a minute. A paired secondary has got the network's 16-digit
 code from the controller and joins at once when it is in no Wi-Fi network, otherwise when no
-controller has reached it for a few seconds. So tablets paired at home find each other at the venue
-without any tap.
-A secondary never paired, with no shared Wi-Fi: tap its middle (or ☰) → **Join direct network…** and
+controller has reached it for a few seconds.
+A secondary never paired, with no Wi-Fi to share: tap its middle (or ☰) → **Join direct network…** and
 type the code the controller shows (in **Screens** while the network runs, or menu → **Direct
 network**); it then appears under *Nearby* for pairing. Wi-Fi has to be switched on, but no Wi-Fi
 network is needed, and a home Wi-Fi may stay connected alongside. Started by hand, the network stays
 while MTPV is on the controller's screen. When
 MTPV leaves the screen the network stops, on a secondary it is left; both start again at once when
 MTPV is back. Menu → **Direct network**:
-*Start by itself when needed* (on by default), **Start**/**Stop** by hand (Stop holds until the next
-app start), **New code** (secondaries reachable only through the network then need it typed).
+**Start**/**Stop** by hand (Stop holds until the next app start), **New code** (secondaries reachable only through the network then need it typed).
 **Leave** on a secondary forgets the code until the controller hands it over again. Android asks once
 to allow *Nearby devices* (Android 12 and older: location, after a note that MTPV never reads it; if it then fails, switching location on
 may help): on the controller once screens are paired, on a secondary once it has a code. The code
@@ -130,7 +129,7 @@ page's strokes one by one, newest first, whichever screen they were drawn on (er
 undone). Without a stylus, tap the square finger switch at the left of the bar (green = on): a
 finger then draws like the stylus, and taps and swipes on the page no longer turn it, so use a pedal or switch it off again.
 Tool and finger switch are the same on all screens, like one big sheet of paper: what you pick on
-one screen is picked on all of them. The stylus draws on every screen whatever the switch says.
+one screen is picked on all of them. A stylus always draws, whatever the finger switch says.
 Notes belong to the set, not to the PDF: the folder is only what MTPV reads, and MTPV never writes
 to it. Order, ticks and notes are kept in the app, so a copy of the PDF in another set, or under
 another name in the same set, has notes of its own, and a new set starts without notes. Deleting a
@@ -140,17 +139,21 @@ with exactly the same PDF, in any set (newest first, with set and date); they re
 
 Page numbers: the bar at the top center of every screen shows where its page is, as "Song 2 of 7 | Page 1 of 3":
 the song among the songs shown in the set and the page within that song. A single PDF shows just "Page 1 of 3".
-On the leftmost screen, controller or secondary, the song number sits between **«** and **»**: they show the
+On the leftmost screen, controller or secondary, the song number sits between the buttons **«** and **»**: they show the
 previous or next song from the leftmost screen (dimmed at the first and last song).
 
 Dark pages: **◐** at the top right of any screen swaps light and dark on all screens: white paper turns very dark gray, black notes off-white
 (softer than pure black and white, which makes thin lines blur for many eyes).
-Colours keep their hue (red notes stay red); the marker tints the black paper instead of the white.
+Colors keep their hue (red notes stay red); the marker tints the black paper instead of the white.
 PdfRenderer has no dark mode, so the rendered page is inverted in linear light
 (not in sRGB values), which keeps thin lines such as staves and stems as strong as on paper.
 
 Status dots (top right): green = secondary shows the right page, yellow = sending the PDF, red = unreachable.
 On a secondary, tap the middle of the screen (or ☰ top left) for its address, paired controllers and **Device role**.
+
+Help: in the menu (on a secondary: tap its middle or ☰), short pages on each topic. Its last page,
+**Share MTPV**, shows a QR code of https://ernstkl.github.io/fdroid/ for another device's camera:
+the page there tells how to install MTPV.
 
 ## How it works
 
@@ -173,10 +176,11 @@ On a secondary, tap the middle of the screen (or ☰ top left) for its address, 
   (100 files / 2 GB, least recently used are removed first; the controller never removes the open set's files).
 - A folder is read through the Storage Access Framework (read access only, kept across restarts; one
   grant for the library folder covers every folder below it). Its
-  PDFs are copied into the cache; `filesDir/sets/<hash of the folder's document ID>.json` keeps the
+  new or changed PDFs are copied into the cache when the folder is read; `filesDir/sets/<hash of the folder's document ID>.json` keeps the
   song order and each file's size and date, so unchanged files are not read again, plus a random set
-  ID, each song's notes ID and the folder's path below the library folder. A folder without a record
-  takes over the one with the same path whose files are mostly there (the library moved). A single
+  ID, each song's notes ID and the folder's path below the library folder. When the library moved,
+  its folders have new document IDs: a record is then re-associated with the folder at the same
+  path, if most of its files are there. A single
   PDF gets a record of its own, keyed by its document. Secondaries only ever see single files: the
   controller works out each screen's file and page.
 - Every display command carries a version (strictly increasing, persisted); secondaries ignore older ones.

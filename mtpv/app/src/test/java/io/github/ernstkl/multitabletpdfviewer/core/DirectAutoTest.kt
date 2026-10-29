@@ -9,15 +9,14 @@ import org.junit.Test
 class DirectAutoTest {
     @Test
     fun controllerStartsAsSoonAsAScreenIsOutOfReach() {
-        assertTrue(DirectAuto.controllerStart(auto = true, running = false, stoppedByHand = false, missing = true))
-        assertFalse(DirectAuto.controllerStart(auto = true, running = false, stoppedByHand = false, missing = false))
+        assertTrue(DirectAuto.controllerStart(running = false, stoppedByHand = false, missing = true))
+        assertFalse(DirectAuto.controllerStart(running = false, stoppedByHand = false, missing = false))
     }
 
     @Test
-    fun controllerDoesNotStartWhenOffRunningOrStoppedByHand() {
-        assertFalse(DirectAuto.controllerStart(auto = false, running = false, stoppedByHand = false, missing = true))
-        assertFalse(DirectAuto.controllerStart(auto = true, running = true, stoppedByHand = false, missing = true))
-        assertFalse(DirectAuto.controllerStart(auto = true, running = false, stoppedByHand = true, missing = true))
+    fun controllerDoesNotStartWhenRunningOrStoppedByHand() {
+        assertFalse(DirectAuto.controllerStart(running = true, stoppedByHand = false, missing = true))
+        assertFalse(DirectAuto.controllerStart(running = false, stoppedByHand = true, missing = true))
     }
 
     @Test
@@ -32,11 +31,10 @@ class DirectAutoTest {
 
     @Test
     fun screensStartsOnlyWhenNothingIsReachable() {
-        assertTrue(DirectAuto.startOnScreens(auto = true, running = false, anyOnline = false, nearby = 0))
-        assertFalse(DirectAuto.startOnScreens(auto = true, running = false, anyOnline = true, nearby = 0))
-        assertFalse(DirectAuto.startOnScreens(auto = true, running = false, anyOnline = false, nearby = 1))
-        assertFalse(DirectAuto.startOnScreens(auto = false, running = false, anyOnline = false, nearby = 0))
-        assertFalse(DirectAuto.startOnScreens(auto = true, running = true, anyOnline = false, nearby = 0))
+        assertTrue(DirectAuto.startOnScreens(running = false, anyOnline = false, nearby = 0))
+        assertFalse(DirectAuto.startOnScreens(running = false, anyOnline = true, nearby = 0))
+        assertFalse(DirectAuto.startOnScreens(running = false, anyOnline = false, nearby = 1))
+        assertFalse(DirectAuto.startOnScreens(running = true, anyOnline = false, nearby = 0))
     }
 
     @Test

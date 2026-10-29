@@ -22,11 +22,11 @@ object DirectAuto {
     const val FIRST_CONTACT_MS = 3_500L
 
     /**
-     * Controller, checked every second: start if [auto], not [running], not stopped by hand this
-     * session, and a screen in the arrangement is out of reach ([missing]).
+     * Controller, checked every second: start if not [running], not stopped by hand this session,
+     * and a screen in the arrangement is out of reach ([missing]).
      */
-    fun controllerStart(auto: Boolean, running: Boolean, stoppedByHand: Boolean, missing: Boolean): Boolean =
-        auto && !running && !stoppedByHand && missing
+    fun controllerStart(running: Boolean, stoppedByHand: Boolean, missing: Boolean): Boolean =
+        !running && !stoppedByHand && missing
 
     /**
      * Controller, checked every second: stop the network it started by itself ([byItself]) when
@@ -37,8 +37,8 @@ object DirectAuto {
         byItself && clients == 0 && reachableFor != null && reachableFor >= UNNEEDED_MS
 
     /** Controller, when Screens is opened: start if nothing can be reached here, so the others can join. */
-    fun startOnScreens(auto: Boolean, running: Boolean, anyOnline: Boolean, nearby: Int): Boolean =
-        auto && !running && !anyOnline && nearby == 0
+    fun startOnScreens(running: Boolean, anyOnline: Boolean, nearby: Int): Boolean =
+        !running && !anyOnline && nearby == 0
 
     enum class Join { START, STOP, NONE }
 

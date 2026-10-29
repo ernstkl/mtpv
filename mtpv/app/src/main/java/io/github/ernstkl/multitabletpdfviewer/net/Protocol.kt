@@ -92,8 +92,6 @@ import io.github.ernstkl.multitabletpdfviewer.core.PairCode
  * a list of all screens with their app and API versions, so the devices can be updated. App
  * versions may differ. Equal API versions on both sides is all it takes, so the check runs on the
  * controller alone.
- *
- * During development all devices run the same app version; there are no fallbacks for older ones.
  */
 object Protocol {
     const val SERVICE_TYPE = "_mtpv._tcp"

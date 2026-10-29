@@ -53,8 +53,8 @@ class Prefs(private val context: Context) {
         get() = runCatching { Role.valueOf(sp.getString("role", null)!!) }.getOrDefault(Role.NONE)
         set(value) = sp.edit().putString("role", value.name).apply()
 
-    /** The about dialog opens by itself until it has been closed once. */
-    var aboutShown: Boolean
+    /** The help dialog opens by itself until it has been closed once. */
+    var helpShown: Boolean
         get() = sp.getBoolean("aboutShown", false)
         set(value) = sp.edit().putBoolean("aboutShown", value).apply()
 
@@ -85,11 +85,6 @@ class Prefs(private val context: Context) {
     var directCode: String?
         get() = sp.getString("directCode", null)
         set(value) = sp.edit().putString("directCode", value).apply()
-
-    /** Controller: the direct network starts by itself when the screens cannot be reached otherwise. */
-    var directAuto: Boolean
-        get() = sp.getBoolean("directAuto", true)
-        set(value) = sp.edit().putBoolean("directAuto", value).apply()
 
     /** Secondary: the code of the direct network it joined last, null after Leave. */
     var directJoin: String?

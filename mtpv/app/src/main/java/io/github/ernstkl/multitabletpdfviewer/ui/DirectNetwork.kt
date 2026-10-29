@@ -16,7 +16,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -25,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -101,18 +99,14 @@ fun AskDirectPermission(needed: Boolean, onAnswered: () -> Unit) {
 }
 
 /** Subtitle of Direct network in the controller's menu. */
-fun directSubtitle(state: DirectState, code: String, auto: Boolean): String = when {
-    state != DirectState.Off -> DirectCode.format(code)
-    auto -> "Starts when needed"
-    else -> "Off"
-}
+fun directSubtitle(state: DirectState, code: String): String =
+    if (state != DirectState.Off) DirectCode.format(code) else "Starts when needed"
 
-/** The controller's direct network: its code, whether it starts by itself, Start or Stop, New code. */
+/** The controller's direct network: its code, Start or Stop, New code. */
 @Composable
 fun DirectNetworkDialog(rt: ControllerRuntime, onDismiss: () -> Unit) {
     val state by rt.direct.state.collectAsStateWithLifecycle()
     val code by rt.directCode.collectAsStateWithLifecycle()
-    val auto by rt.directAuto.collectAsStateWithLifecycle()
     val start = withDirectPermission(rt::startDirect)
     val on = state != DirectState.Off
     AlertDialog(
@@ -124,7 +118,7 @@ fun DirectNetworkDialog(rt: ControllerRuntime, onDismiss: () -> Unit) {
                 Text(DirectCode.format(code), style = MaterialTheme.typography.headlineMedium, fontFamily = FontFamily.Monospace)
                 Text(
                     when (val s = state) {
-                        DirectState.Off -> if (auto) "Off until needed" else "Off"
+                        DirectState.Off -> "Off until needed"
                         DirectState.Starting -> "Starting…"
                         is DirectState.Up -> "On · " + when (s.clients) {
                             0 -> "no tablet joined yet"
@@ -135,12 +129,9 @@ fun DirectNetworkDialog(rt: ControllerRuntime, onDismiss: () -> Unit) {
                     },
                     style = MaterialTheme.typography.titleSmall,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Start by itself when needed", Modifier.weight(1f))
-                    Switch(checked = auto, onCheckedChange = rt::setDirectAuto)
-                }
                 Text(
-                    "It starts when a paired screen cannot be reached, or when Screens finds nothing. " +
+                    "It starts by itself when a paired screen cannot be reached, or when Screens finds nothing; " +
+                        "Stop keeps it off until MTPV is started again. " +
                         "Paired secondaries get the code from here and join by themselves. " +
                         "A secondary never paired: ☰ → Join direct network… there, type this code, then pair it under Screens.",
                     style = MaterialTheme.typography.bodySmall,
