@@ -41,8 +41,8 @@ class DirectJoin(context: Context) : DirectWifi(context) {
             every = minOf(every * 2, MAX_RETRY_MS)
         }
         val (m, ch) = p2p() ?: return
-        m.requestGroupInfo(ch) { g ->
-            val config = config ?: return@requestGroupInfo
+        requestGroup(m, ch) { g ->
+            val config = config ?: return@requestGroup
             when {
                 isOurs(g) && g?.isGroupOwner == false -> onGroup(g)
                 g != null -> m.removeGroup(ch, object : WifiP2pManager.ActionListener {

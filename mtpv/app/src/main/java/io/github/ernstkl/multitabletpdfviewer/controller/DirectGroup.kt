@@ -32,8 +32,8 @@ class DirectGroup(context: Context) : DirectWifi(context) {
         if (code == null) return
         if (_state.value !is DirectState.Up) handler.postDelayed(retry, RETRY_MS)
         val (m, ch) = p2p() ?: return
-        m.requestGroupInfo(ch) { g ->
-            val config = config ?: return@requestGroupInfo
+        requestGroup(m, ch) { g ->
+            val config = config ?: return@requestGroup
             when {
                 g == null -> m.createGroup(ch, config, listener(::failed))
                 isOurs(g) && g.isGroupOwner -> onGroup(g)

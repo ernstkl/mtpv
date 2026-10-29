@@ -13,6 +13,7 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pGroup
+import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Handler
@@ -133,10 +134,21 @@ abstract class DirectWifi(context: Context) {
         return m to ch
     }
 
+    /**
+     * The group this device is in, or null. Only a formed group counts: Android 10 (YT-X705F) keeps
+     * the group of a failed or ended join and still hands it out, without an address; taken for
+     * joined, it stopped all further tries.
+     */
+    protected fun requestGroup(m: WifiP2pManager, ch: WifiP2pManager.Channel, onResult: (WifiP2pGroup?) -> Unit) {
+        m.requestConnectionInfo(ch) { info ->
+            if (info?.groupFormed == true) m.requestGroupInfo(ch, onResult) else onResult(null)
+        }
+    }
+
     /** Asks for the group this device is in and passes it to [onGroup]. */
     protected fun checkGroup() {
         val (m, ch) = p2p() ?: return
-        m.requestGroupInfo(ch) { if (code != null) onGroup(it) }
+        requestGroup(m, ch) { if (code != null) onGroup(it) }
     }
 
     /**
@@ -170,8 +182,11 @@ abstract class DirectWifi(context: Context) {
                     if (on && !was) onEnabled()
                     else if (!on && !wifiOn()) _state.value = DirectState.Failed(reasonText(WifiP2pManager.ERROR))
                 }
-                WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION ->
-                    onGroup(IntentCompat.getParcelableExtra(intent, WifiP2pManager.EXTRA_WIFI_P2P_GROUP, WifiP2pGroup::class.java))
+                WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
+                    val info = IntentCompat.getParcelableExtra(intent, WifiP2pManager.EXTRA_WIFI_P2P_INFO, WifiP2pInfo::class.java)
+                    val group = IntentCompat.getParcelableExtra(intent, WifiP2pManager.EXTRA_WIFI_P2P_GROUP, WifiP2pGroup::class.java)
+                    onGroup(group?.takeIf { info?.groupFormed == true })
+                }
             }
         }
     }
