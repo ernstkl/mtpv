@@ -1,0 +1,2 @@
+- About is now Help, sharing option added
+- Direct network: "starts when needed" no longer user-switchable

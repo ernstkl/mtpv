@@ -116,8 +116,7 @@ private val Sections = listOf(
         "Share MTPV",
         "A QR code for another device: where to get MTPV.",
         listOf(
-            "Scan this with the camera of another device. The page it opens, ernstkl.github.io/fdroid, " +
-                "tells how to install MTPV: through F-Droid, which also brings updates, or as an APK.",
+            "Visit https://ernstkl.github.io/fdroid for installing MTPV",
         ),
         R.drawable.share_qr,
     ),
